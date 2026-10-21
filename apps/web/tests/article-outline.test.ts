@@ -13,7 +13,7 @@ test("a wrapping outline settles with classic scrollbars at a limited viewport h
   const item: SiteItemDetail = {
     id: "outline-fixture", title: "目录滚动检查", summary: "固定摘要", reason: "固定推荐理由", source: { name: "Fixture" },
     publishedAt: at, timelineAt: at, discoveredAt: at, category: null, tags: [], score: 80, selected: true,
-    channel: "news", x: null, originalTitle: null, links: { original: "https://example.org/article" },
+    channel: "news", companies: [], x: null, originalTitle: null, links: { original: "https://example.org/article" },
     story: null, readingMode: "full", author: null, outline, relatedStories: [], topics: [], indexable: false,
     markdownAvailable: false, group: null, hasTranslation: false, bodyLanguage: "zh",
     body: { zh: outline.map((o) => `<h2 id="${o.id}">${o.text}</h2><p>${"固定正文。".repeat(100)}</p>`).join(""), original: null, zhKind: "original", complete: true },
@@ -21,7 +21,6 @@ test("a wrapping outline settles with classic scrollbars at a limited viewport h
   const api = createServer((req, res) => {
     const path = new URL(req.url!, "http://local").pathname;
     res.setHeader("Content-Type", "application/json");
-    if (path === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: "fixture" }));
     if (path === "/api/site/track") { res.statusCode = 204; return res.end(); }
     if (path === "/api/site/items/outline-fixture") return res.end(JSON.stringify(item));
     res.statusCode = 404; res.end("{}");

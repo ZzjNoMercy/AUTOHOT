@@ -365,6 +365,123 @@
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false
+    },
+    {
+      "id": "gasgoo-auto",
+      "name": "盖世汽车",
+      "kind": "web_list",
+      "config": {
+        "url": "https://auto.gasgoo.com/auto-news/C-103-106-107-108-109-110-303-409-501-601",
+        "parseMode": "html",
+        "itemSelector": "div.listArticle > div",
+        "linkSelector": "p a",
+        "titleSelector": "h2 a",
+        "publishedAtSelector": "span.time",
+        "publishedAtUtcOffset": "+08:00",
+        "_aihot": {
+          "initialBackfillLimit": 30
+        }
+      },
+      "tier": "T2",
+      "owner_entity_id": null,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "汽车媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "xchuxing-official",
+      "name": "新出行",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.xchuxing.com/api/v1/home/new/official-content?category=7&per-page=50",
+        "mode": "json_api",
+        "itemsPath": "data",
+        "titlePaths": [
+          "title"
+        ],
+        "summaryPaths": [
+          "summary"
+        ],
+        "urlTemplate": "https://www.xchuxing.com/article/{object_id}",
+        "publishedAtPath": "created_at",
+        "publishedAtUnit": "epoch_s",
+        "externalIdPath": "object_id",
+        "_aihot": {
+          "initialBackfillLimit": 30
+        }
+      },
+      "tier": "T2",
+      "owner_entity_id": null,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "汽车媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "xchuxing-npower",
+      "name": "新出行（新能源动力）",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.xchuxing.com/api/v1/home/new/official-content?category=5&per-page=50",
+        "mode": "json_api",
+        "itemsPath": "data",
+        "titlePaths": [
+          "title"
+        ],
+        "summaryPaths": [
+          "summary",
+          "content"
+        ],
+        "urlTemplate": "https://www.xchuxing.com/number-power/{object_id}",
+        "publishedAtPath": "created_at",
+        "publishedAtUnit": "epoch_s",
+        "externalIdPath": "object_id",
+        "_aihot": {
+          "initialBackfillLimit": 30
+        }
+      },
+      "tier": "T2",
+      "owner_entity_id": null,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "汽车媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "ithome-auto",
+      "name": "IT之家（汽车）",
+      "kind": "web_list",
+      "config": {
+        "url": "https://auto.ithome.com/",
+        "parseMode": "html",
+        "itemSelector": "ul.bl > li",
+        "linkSelector": "a.title",
+        "titleSelector": "a.title",
+        "publishedAtRegex": "data-ot=\"(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2})",
+        "publishedAtUtcOffset": "+08:00",
+        "_aihot": {
+          "initialBackfillLimit": 30
+        }
+      },
+      "tier": "T2",
+      "owner_entity_id": null,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "汽车媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
     }
   ]
 }

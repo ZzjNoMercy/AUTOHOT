@@ -5,8 +5,10 @@ import type { AdminSettings } from "@aihot/contracts/admin";
 import { adminGet } from "../../lib/admin.server";
 import { useAdminAction } from "../../features/admin/action";
 import { bj, num } from "../../features/admin/format";
+import { PROVIDER_KEY_LABEL } from "../../features/admin/labels";
 import { AdminPage, Badge, Button, Card, DataTable, Input, ReasonDialog } from "../../features/admin/ui";
 import { toast } from "../../features/admin/toast";
+import { loadParts } from "../../site-modules";
 
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -14,6 +16,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export const meta: Route.MetaFunction = () => [{ title: `设置 · ${SITE.name} 后台` }];
+
+const SETTINGS_CARDS = await loadParts((m) => m.admin?.settingsCards);
 
 function QrSlot({ slot, label, src }: { slot: "wechatQr" | "feishuQr"; label: string; src: string | null }) {
   const { run, pending } = useAdminAction();
@@ -99,6 +103,55 @@ function TargetToggle({ t }: { t: AdminSettings["targets"][number] }) {
   );
 }
 
+function ProviderKeyRow({ p }: { p: AdminSettings["providers"][number] }) {
+  const { run, pending } = useAdminAction();
+  const [value, setValue] = useState("");
+  const info = PROVIDER_KEY_LABEL[p.name] ?? { label: p.name, hint: "" };
+  const saved = p.from === "admin";
+  const placeholder = value.trim() ? "" : saved ? "已保存在后台，粘贴新 key 可替换" : "粘贴 key";
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <div className="min-w-[220px] flex-1">
+        <div className="text-[14px] font-medium text-ink">{info.label} <span className="font-mono text-[11.5px] text-ink-4">{p.name}</span></div>
+        {info.hint && <div className="mt-0.5 text-[12px] text-ink-3">{info.hint}</div>}
+        <div className="mt-1 flex items-center gap-2 text-[12px] text-ink-4">
+          <Badge tone={p.from ? "ok" : "muted"}>{saved ? "已保存在后台" : p.from === "env" ? "来自环境变量" : "未设置"}</Badge>
+          {p.masked && <span className="font-mono">{p.masked}</span>}
+        </div>
+      </div>
+      <Input
+        type="password"
+        autoComplete="off"
+        spellCheck={false}
+        className="!w-56"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <Button
+        size="sm"
+        tone="primary"
+        disabled={!value.trim()}
+        busy={pending === `key-${p.name}`}
+        onClick={async () => {
+          if (await run("POST", "/api/admin/settings/provider-key", { name: p.name, value: value.trim() }, { label: `key-${p.name}`, success: "密钥已保存，下一次采集就用它" })) setValue("");
+        }}
+      >
+        保存
+      </Button>
+      <Button
+        size="sm"
+        tone="danger"
+        disabled={!saved}
+        busy={pending === `key-clear-${p.name}`}
+        onClick={() => run("POST", "/api/admin/settings/provider-key", { name: p.name, value: null }, { label: `key-clear-${p.name}`, success: "已清除，回退到环境变量" })}
+      >
+        清除
+      </Button>
+    </div>
+  );
+}
+
 export default function SettingsAdmin({ loaderData: s }: Route.ComponentProps) {
   return (
     <AdminPage title="设置" subtitle="不改代码即可替换的运营设置。每次修改都写入审计记录。">
@@ -122,6 +175,13 @@ export default function SettingsAdmin({ loaderData: s }: Route.ComponentProps) {
           />
         </Card>
       </div>
+      <Card className="mt-5" title="采集凭据" right={<span>保存后立即生效，不用重启</span>}>
+        <div className="space-y-5">
+          {s.providers.map((p) => <ProviderKeyRow key={p.name} p={p} />)}
+          <p className="text-[12px] text-ink-4">密钥和登录态只保存在服务端，页面和审计记录里都只有尾部几位。清掉后台保存的值就回退到环境变量。</p>
+        </div>
+      </Card>
+      {SETTINGS_CARDS.map(({ name, part: CardPart }) => <CardPart key={name} data={s.modules[name]} />)}
       <Card className="mt-5" title="付费请求上限" right={<span>已用：近 1 小时 / 近 24 小时</span>} pad={false}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-[13px]">

@@ -224,6 +224,8 @@ export interface ServerModule {
     counts?: Record<string, () => Promise<number>>;
     /** Its part of the admin's runs page, under its name (admin/runs.ts); its web module draws it. */
     runs?: () => Promise<unknown>;
+    /** Its part of the admin's settings page, under its name (admin/settings.ts); its web module draws it. */
+    settings?: () => Promise<unknown>;
   };
   models?: Record<string, ModelStep>;
   /** Cron schedules (the worker). */

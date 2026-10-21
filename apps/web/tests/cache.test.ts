@@ -9,16 +9,16 @@ import { startWebServer, type WebServer } from "./web-server.ts";
 let web: WebServer;
 let origin: string;
 let deadline: number;
-/** Root metadata answers only after the selected deadline has passed: a slow sibling loader. */
-let metaAfterDeadline = false;
+/** A sibling request answers only after the selected deadline has passed: a slow sibling loader. */
+let companiesAfterDeadline = false;
 const apiCookies: Array<string | undefined> = [];
 const api = createServer((req, res) => {
   const url = new URL(req.url!, "http://api.local");
   apiCookies.push(req.headers.cookie);
   res.setHeader("Content-Type", "application/json");
-  if (url.pathname === "/api/site/meta") {
-    const respond = () => res.end(JSON.stringify({ changelogVersion: "2026-09-28T12:00" }));
-    return metaAfterDeadline ? setTimeout(respond, deadline * 1000 - Date.now() + 50) : respond();
+  if (url.pathname === "/api/site/companies") {
+    const respond = () => res.end(JSON.stringify({ companies: [] }));
+    return companiesAfterDeadline ? setTimeout(respond, deadline * 1000 - Date.now() + 50) : respond();
   }
   if (url.pathname === "/api/site/timeline") {
     const filters = { channel: "all", category: url.searchParams.get("category"), tag: null };
@@ -142,10 +142,10 @@ test("browser freshness shares the selected deadline, including slow sibling loa
       assert.doesNotMatch(cc, /stale/);
       await res.text();
     }
-    // The selected loader initially grants a positive TTL (at least a whole second), but root metadata
-    // finishes after it.
+    // The selected loader initially grants a positive TTL (at least a whole second), but a sibling
+    // request finishes after it.
     deadline = Math.floor(Date.now() / 1000) + 2;
-    metaAfterDeadline = true;
+    companiesAfterDeadline = true;
     await Promise.all(["/", "/_.data?_routes=routes%2Fhome"].map(async (pathname) => {
       const res = await fetch(origin + pathname);
       assert.equal(res.status, 200);
@@ -155,7 +155,7 @@ test("browser freshness shares the selected deadline, including slow sibling loa
     }));
   } finally {
     deadline = savedDeadline;
-    metaAfterDeadline = false;
+    companiesAfterDeadline = false;
   }
 });
 

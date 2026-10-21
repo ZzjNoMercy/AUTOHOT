@@ -129,6 +129,8 @@ export interface WebModule {
     content?: AdminNavEntry[];
     /** Its part of the runs page, drawn from what its server module's admin.runs returns. */
     runs?: Part<ComponentType<{ data: unknown }>>;
+    /** Its part of the settings page, drawn from what its server module's admin.settings returns. */
+    settingsCards?: Part<ComponentType<{ data: unknown }>>;
     /** The page the admin opens on instead of the sources (routes/admin/index.tsx); the first module's wins. */
     landing?: string;
     /** Where the model prices are kept: the models page links its 未定价 there (routes/admin/models.tsx). */
@@ -142,8 +144,6 @@ export interface WebModule {
     Top?: ComponentType;
     /** After the page. */
     Bottom?: ComponentType;
-    /** Headers the document's own request to the api carries (the root loader). */
-    documentHeaders?: (request: Request) => Record<string, string>;
   };
   agent?: Part<AgentPart>;
   topicPage?: Part<TopicPagePart>;

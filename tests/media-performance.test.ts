@@ -42,6 +42,9 @@ const server = createServer(async (req, res) => {
   if (req.url === "/binary-alias") { res.writeHead(200, { "content-type": "binary/octet-stream" }); return res.end(png); }
   if (req.url === "/binary-alias-error") { res.writeHead(200, { "content-type": "binary/octet-stream" }); return res.end("<html>Not an image</html>"); }
   if (req.url === "/binary-error") { res.writeHead(200, { "content-type": "application/octet-stream" }); return res.end("<html>Image not found</html>"); }
+  // A PNG (and a page) served under the .ico name with the type sites usually give it.
+  if (req.url === "/favicon-as-png.ico") { res.writeHead(200, { "content-type": "image/x-icon" }); return res.end(png); }
+  if (req.url === "/favicon-as-page.ico") { res.writeHead(200, { "content-type": "image/x-icon" }); return res.end("<html>Not an image</html>"); }
   if (req.url === "/fail") { failureHits++; res.writeHead(502); return res.end(); }
   imageHits++;
   await new Promise((resolve) => setTimeout(resolve, 60));
@@ -360,6 +363,22 @@ test("pending animations expire at caches, then publish the prepared disk rendit
   assert.deepEqual(unsupported.body, overBudgetGif);
   assert.equal(unsupported.pendingAnimation, undefined);
   assert.equal(await convertAnimated(`${base}/over-budget.gif`, "thumb"), 0);
+  await app.close();
+});
+
+test("a PNG served under the .ico name is an icon; a page under the same name is not", async () => {
+  const { default: Fastify } = await import("fastify");
+  const { registerMedia } = await import("../apps/api/src/routes/media.ts");
+  const { proxiedImage } = await import("@aihot/backend/media/imgproxy");
+  const app = Fastify();
+  registerMedia(app);
+  // Gasgoo answers /favicon.ico with a PNG typed image/x-icon; the icon was dropped as unreadable.
+  const icon = await app.inject({ url: proxiedImage(`${base}/favicon-as-png.ico`, "avatar")! });
+  assert.equal(icon.statusCode, 200);
+  assert.equal(icon.headers["content-type"], "image/webp");
+  assert.equal((await sharp(icon.rawPayload).metadata()).width, 96);
+  const page = await app.inject({ url: proxiedImage(`${base}/favicon-as-page.ico`, "avatar")! });
+  assert.equal(page.statusCode, 502);
   await app.close();
 });
 

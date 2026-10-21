@@ -82,8 +82,12 @@ function original(url: string): Promise<GuardedResponse> {
 async function fetchOriginal(url: string): Promise<GuardedResponse> {
   const allowed = upstreamAllowed();
   if (!allowed.ok) throw new ImageBudgetExceeded(allowed.reason);
+  // Some hosts answer a foreign request 403 and only serve it with a Referer of their own site
+  // (sinaimg, the avatars 微博 accounts carry, is one): send the image's origin, as a same-site
+  // subresource would. It carries nothing.
   const res = await guardedFetch(url, {
-    timeoutMs: 20_000, maxBytes: 15 * 1024 * 1024, headers: { accept: "image/avif,image/webp,image/*,*/*;q=0.8" },
+    timeoutMs: 20_000, maxBytes: 15 * 1024 * 1024,
+    headers: { accept: "image/avif,image/webp,image/*,*/*;q=0.8", referer: `${new URL(url).origin}/` },
   });
   recordUpstream(res.body.length);
   if (res.status !== 200) throw new Error(`upstream ${res.status}`);
@@ -244,12 +248,22 @@ async function encodeImage(body: Buffer, upstreamType: string, mode: string, vec
   const binary = suppliedType === "application/octet-stream" || suppliedType === "binary/octet-stream" || suppliedType === "";
   if (!suppliedType.startsWith("image/") && !ico && !binary) throw new Error("upstream is not an image");
   let type = ico ? "image/png" : suppliedType;
-  if (/icon$/.test(type) && !ico) throw new Error("unreadable icon");
+  // Several sites answer /favicon.ico with a PNG (or another bitmap) labelled image/x-icon. Keep
+  // refusing HTML and error pages that carry the same label, but accept bytes sharp can read and
+  // store them under the type they really are.
+  const labelledIcon = /icon$/.test(type) && !ico;
   const avatar = mode === "avatar" || mode.startsWith("avatar-");
   const width = IMAGE_WIDTHS[mode as keyof typeof IMAGE_WIDTHS] ?? 1600;
   const raw = ico && !Buffer.isBuffer(ico) ? { raw: { width: ico.width, height: ico.height, channels: 4 as const } } : {};
   const input = ico && !Buffer.isBuffer(ico) ? ico.raw : ico ?? body;
-  const meta = await sharp(input, { ...raw, failOn: "none" }).metadata();
+  const meta = await sharp(input, { ...raw, failOn: "none" }).metadata().catch((error) => {
+    if (labelledIcon) throw new Error("unreadable icon");
+    throw error;
+  });
+  if (labelledIcon) {
+    if (!meta.mediaType?.startsWith("image/")) throw new Error("unreadable icon");
+    type = meta.mediaType;
+  }
   if (binary && !ico) {
     if (!meta.mediaType?.startsWith("image/")) throw new Error("upstream is not an image");
     type = meta.mediaType;

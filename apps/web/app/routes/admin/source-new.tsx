@@ -59,7 +59,7 @@ export default function NewSource() {
                   setPreview(null);
                 }}
               >
-                {Object.entries(KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {Object.keys(TEMPLATES).map((k) => <option key={k} value={k}>{KIND_LABEL[k] ?? k}</option>)}
               </Select>
             </Field>
             <Field label="采集间隔（分钟）">

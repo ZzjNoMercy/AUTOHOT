@@ -31,6 +31,13 @@ export const CATEGORY_GUIDE = CATEGORIES.map((c) => `- ${c.key}（${c.label}）�
 export const isRelease = (category: string | null, tags: readonly string[]) => RELEASE !== null && category === RELEASE.category && tags.includes(RELEASE.tag);
 
 const key = (value: string) => value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, "");
+
+/** The name readers know a subject by; the id itself when the dictionary does not have it. */
+export function entityName(id: string): string {
+  return ENTITIES[id]?.name ?? id;
+}
+
+
 /** Exact entity/alias only: mentions embedded in a sentence are not ownership. */
 export function entityIdentity(value: string | null | undefined): string | null {
   if (!value?.trim()) return null;

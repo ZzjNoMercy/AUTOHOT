@@ -1,45 +1,36 @@
 
-【AI 领域翻译规则 — 本平台 100% 是 AI/ML/LLM 行业内容，严格遵守】
+【汽车科技领域翻译规则 — 本平台是汽车/新能源与智能科技内容，严格遵守】
 
-1. 歧义默认值：以下词在中文有非 AI 歧义，**一律按 AI 含义翻译**：
-   - LLM = 大语言模型（绝不译"法学硕士"/"Master of Laws"）
-   - Token / tokens = 模型 token（保留英文；绝不译"代币"/"令牌"）
-   - Transformer = Transformer 架构（保留英文；不译"变压器"）
-   - Diffusion = 扩散模型（AI 生成，不是物理扩散）
-   - Agent / Agentic = AI 智能体 / 智能体的（不译"代理人"/"中介"）
-   - Alignment = 对齐（AI 安全语境）
-   - Inference = 推理（模型生成）
-   - Reasoning = 推理（注意：与 inference 都译"推理"，必要时用"链式推理"区分 CoT；reasoning model 指 o1/o3/R1 这类思考型模型）
-   - Embedding = 嵌入向量（也可保留英文）
-   - Distillation = 知识蒸馏
-   - Hallucination = 模型幻觉
-   - Fine-tune / Fine-tuning = 微调
-   - Pretrain / Pretraining = 预训练
-   - Context window = 上下文窗口
-   - Prompt = 提示词
-   - Skill / Skills = 技能（Claude 等 Agent 框架的能力包，不译"特长"）
+1. 歧义默认值：以下词在中文有非本行业歧义，**一律按汽车/科技含义翻译**：
+   - 智驾 = 智能驾驶（不译“智慧驾驶”；“自驾”只用于自驾游）
+   - 三电 = 电池、电机、电控（保留“三电”）
+   - 增程 = 增程式（不译“增程器扩展”）
+   - 插混 = 插电式混合动力（PHEV）；油混 = HEV；纯电 = BEV
+   - 换电 = 换电（不译“更换电池服务”以外的说法）
+   - 座舱 = 智能座舱（不译“驾驶舱”“机舱”）
+   - 车机 = 车载系统（不译“汽车电脑”）
+   - 上险量 = 交强险上险量（不译“保险销量”）
+   - 交付 = 交付（不译“发货”）
+   - 大定 / 小定 = 大定 / 小定（保留）
+   - 破百 = 零到百公里加速（保留“破百”）
+   - AI 词按 AI 含义：LLM = 大语言模型；Token = 模型 token（保留英文，绝不译“代币”）；Agent = AI 智能体（不译“代理人”）；Alignment = 对齐；Inference / Reasoning = 推理；Embedding = 嵌入向量；Hallucination = 模型幻觉；Fine-tune = 微调；Prompt = 提示词
 
 2. 以下专有名词**一律保留英文原文**，不翻译不加中文括注：
-   - AI 公司：OpenAI / Anthropic / Google DeepMind / xAI / Meta AI / Mistral / DeepSeek / Cohere / HuggingFace（HF）/ Runway / ElevenLabs / Suno / Pika / Midjourney / Perplexity
-   - 模型族（举例 + 通用规则）：GPT / Claude / Gemini / Llama / Qwen / Grok / o 系列 / DeepSeek / Mistral / Mixtral / Phi / Sora / Veo / Imagen
-     **规则**：任何大模型族名、产品代号一律保留英文
-   - 模型版本号（举例 + 通用规则）：GPT-5 / Claude 4.7 / Claude Sonnet 4.6 / Llama 4 / Gemini 3 / o3 / o4 / DeepSeek-V4 / Qwen3.7
-     **规则**：版本号一字不改（包括字母数字后缀如 4o / 4.7 / 405B / V4 / R1），绝不"翻译性扩写"（不要把 "405B" 译成 "4050 亿"，不要把 "V4" 译成 "第 4 代"）
-   - 技术缩写（举例 + 通用规则）：LLM / RAG / RLHF / DPO / LoRA / QLoRA / PEFT / MoE / CoT / ReAct / KV cache / SOTA / AGI / MCP / ADK / NPU / GPU / TPU
-     **规则**：任何 2-5 字母的全大写缩写，默认按 AI/ML 含义保留英文
-   - 评测基准（举例 + 通用规则）：MMLU / GPQA / HumanEval / SWE-bench / SWE-bench Verified / AIME / HLE / ARC-AGI / ARC-AGI 2 / MT-Bench / Chatbot Arena / Aider Polyglot / LiveCodeBench
-     **规则**：以 -bench / -eval 结尾或全大写的评测名一律保留英文
-   - AI 工具/产品：Cursor / Copilot / Codex / Aider / Devin / Cline / Claude Code / Windsurf / Zed / v0 / Bolt / Lovable / Replit Agent
-   - Agent 框架：LangChain / LangGraph / LlamaIndex / CrewAI / AutoGen / Pydantic AI / Vercel AI SDK / DSPy
-   - 推理/部署：Ollama / vLLM / SGLang / TensorRT / Triton / CUDA / ROCm
-   - 通用技术：API / SDK / CLI / IDE / SaaS / CDN / SSO / OAuth / JWT / WebSocket / SSE / gRPC
+   - 品牌与集团：BYD / Tesla / NIO / XPeng / Li Auto / Zeekr / Leapmotor / Volkswagen / Toyota / BMW / Mercedes-Benz / GM
+   - 车型与平台：Model 3 / Model Y / Model S / Model X / SU7 / YU7 / SEA / MEB / e-CMP
+   - 技术缩写（举例 + 通用规则）：BEV / HEV / PHEV / EREV / ADAS / NOA / NGP / FSD / AEB / OTA / HUD / L2 / L3 / L4 / CTB / CTG / SiC / LFP / NCM / kWh / kW / N·m / CLTC / WLTP
+     **规则**：任何 2-5 字母的全大写缩写，默认按汽车/科技含义保留英文
+   - 智驾与芯片：Orin / Thor / Snapdragon Ride / Horizon Journey / Momenta / Mobileye / LiDAR / SoC
+   - AI 线：LLM / GPT / Claude / Gemini / Llama / Qwen / DeepSeek / RAG / MoE / Agent / MCP
+   - 通用技术：API / SDK / CLI / V2X / V2G / SaaS / SSO / OAuth
 
-3. 中国厂商**优先用官方中文品牌名**（首次出现可双标"千问（Qwen3）"，后续选一种保持一致）：
-   - 千问（Qwen）/ 文心一言 / 智谱（GLM）/ 月之暗面（Kimi）/ 深度求索（DeepSeek）/ 阶跃星辰（Step）/ 零一万物（Yi）/ 百川 / 豆包（字节）/ 混元（腾讯）/ 可灵（Kling，快手）/ 即梦（Jimeng，字节）/ MiniMax（不译）/ 美团 LongCat / 昆仑万维 Skywork / 面壁 MiniCPM / 华为昇腾 / 寒武纪
+3. 中国厂商**优先用官方中文品牌名**（首次出现可双标“千问（Qwen）”，后续选一种保持一致）：
+   - 整车：比亚迪（王朝、海洋、腾势、方程豹、仰望）/ 蔚来（乐道、萤火虫）/ 小鹏（MONA）/ 理想 / 小米汽车 / 华为（鸿蒙智行、问界、智界、享界、尊界）/ 极氪 / 领克 / 长安（深蓝、阿维塔、启源）/ 吉利（银河、几何）/ 奇瑞（星途、捷途、iCAR）/ 长城（哈弗、魏牌、坦克、欧拉）/ 广汽（埃安、昊铂、传祺）/ 上汽（荣威、名爵、智己、五菱）/ 东风（岚图、奕派）/ 一汽（红旗）/ 北汽（极狐）
+   - 供应链与智驾：宁德时代 / 地平线 / 卓驭 / 禾赛 / 速腾聚创 / 博世
+   - AI 线：千问（Qwen）/ 文心（ERNIE）/ 智谱（GLM）/ 月之暗面（Kimi）/ 深度求索（DeepSeek）/ 豆包（字节）/ 混元（腾讯）/ 可灵（Kling）/ 阶跃星辰（Step）/ 零一万物（Yi）
 
 4. 代码 / 命令 / URL / 数字单位 **一字不改**保留：
    - 反引号代码 `code` 不翻译
-   - 命令如 /code-review、pip install、npm run 不译（不要译"代码审查"）
    - URL 原样
-   - 数字+单位：8k context / 175B params / 3.5x speedup / $3 per M tokens / 99.9%
-   - 金额、参数量、比例、区间必须保留原文的阿拉伯数字和单位；不要把 $10B-$100B 改写成“数百亿至数千亿美元”等中文数量词
+   - 数字+单位：800V / 5C 快充 / 700km CLTC / 3.9s 破百 / 150kW / 500N·m / 12.98 万元 / 99.9%
+   - 金额、续航、功率、比例、区间必须保留原文的阿拉伯数字和单位；不要把 "700km" 改写成“七百公里”之类的中文数量词，也不要把 "12.98 万元" 改写成“近十三万元”

@@ -51,6 +51,7 @@ function Figure({ n, unit }: { n: number; unit: string }) {
 
 const KIND_ORDER: Array<[string, string]> = [
   ["x_search", "X"],
+  ["weibo", "微博"],
   ["rss", "RSS"],
   ["web_list", "网页"],
   ["mp_account", "公众号"],
@@ -154,11 +155,7 @@ function Maker({ maker, contact }: { maker: NonNullable<typeof ABOUT.maker>; con
             <p key={line}>{line}</p>
           ))}
           <p className="text-ink-3">
-            它一直在改，改了什么都写在
-            <Link viewTransition to="/changelog" className="text-accent hover:underline">
-              更新日志
-            </Link>
-            里；有想法、遇到问题，去
+            它一直在改；有想法、遇到问题，去
             <Link viewTransition to="/feedback" className="text-accent hover:underline">
               反馈页
             </Link>

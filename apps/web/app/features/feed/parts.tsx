@@ -6,7 +6,7 @@ import { SourceAvatar } from "../../components/ui/SourceAvatar";
 import { Lightbox } from "../../components/ui/Lightbox";
 import { toggleStar, useIsStarred } from "../../lib/local-state";
 
-/** The source's name, or, for X, avatar + display name + @handle. */
+/** The source's name, or, for X and 微博, avatar + name (X also shows the @handle). */
 export function SourceLine({ item, className = "" }: { item: Pick<FeedItemSummary, "source" | "x" | "channel">; className?: string }) {
   if (item.channel === "x" && item.x) {
     return (
@@ -14,6 +14,16 @@ export function SourceLine({ item, className = "" }: { item: Pick<FeedItemSummar
         <SourceAvatar name={item.x.authorName} avatarUrl={item.x.avatarUrl} avatarSrcSet={item.x.avatarSrcSet} size={16} />
         <span className="truncate text-ink-3">{item.x.authorName}</span>
         <span className="hidden shrink-0 text-ink-4 min-[400px]:inline">@{item.x.handle}</span>
+      </span>
+    );
+  }
+  if (item.channel === "weibo") {
+    // An account, not an outlet: the avatar and the platform say so, as an X post's handle does.
+    return (
+      <span className={`flex min-w-0 items-center gap-1.5 ${className}`}>
+        <SourceAvatar name={item.source.name} avatarUrl={item.source.avatarUrl} size={16} />
+        <span className="truncate text-ink-3">{item.source.name}</span>
+        <span className="hidden shrink-0 text-ink-4 min-[400px]:inline">微博</span>
       </span>
     );
   }

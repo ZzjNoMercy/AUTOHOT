@@ -7,6 +7,12 @@ dist/
 .DS_Store
 .data/
 
+# Local planning documents (this deployment's own)
+docs/plan/
+
+# This deployment's own compose settings
+docker-compose.override.yml
+
 # Web production build
 apps/web/build/
 apps/web/.react-router/

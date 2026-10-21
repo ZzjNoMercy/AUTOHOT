@@ -83,13 +83,19 @@ export const FeedItem = memo(function FeedItem({ item, group, filters, read = fa
       {isX && item.x!.media.length > 0 && <MediaThumbs media={item.x!.media} className="mt-2.5" />}
       {isX && item.x!.quoted?.text && <QuotedLine quoted={item.x!.quoted} />}
 
-      {(tags.length > 0 || (showTags && item.category)) && (
+      {(item.companies.length > 0 || tags.length > 0 || (showTags && item.category)) && (
         <div className="relative z-10 mt-2 hidden flex-wrap gap-x-2.5 gap-y-1 text-[12px] text-ink-4 lg:flex">
           {showTags && item.category && (
             <Link to={`/all?category=${item.category}`} className="hover:text-accent">
               {CATEGORY_LABELS[item.category]}
             </Link>
           )}
+          {/* The companies the analysis named: each one opens the company filter, not the tag list. */}
+          {item.companies.map((c) => (
+            <Link key={c.id} to={`/all?entity=${encodeURIComponent(c.id)}`} className="text-ink-3 hover:text-accent">
+              {c.name}
+            </Link>
+          ))}
           {tags.map((t) => (
             <Link key={t} to={`/all?tag=${encodeURIComponent(t)}`} className="hover:text-accent">
               #{t}

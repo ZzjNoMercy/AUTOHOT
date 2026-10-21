@@ -147,7 +147,7 @@ docker compose up -d --build
 | `industry/prompts/` | 精选标准和写作要求。**你的行业 KnowHow，就写在这里** |
 | `industry/selection.ts` | 入选门槛 |
 | `site/models.ts` | 每一步默认用哪个模型（不改也行：都用 `.env` 里配的那一个） |
-| `site/brand/`、`site/pages/`、`site/public/`、`site/changelog.json` | 图标与 Logo，使用规则和隐私说明，`robots.txt` 这类发布在网站根目录的文件，更新日志 |
+| `site/brand/`、`site/pages/`、`site/public/` | 图标与 Logo，使用规则和隐私说明，`robots.txt` 这类发布在网站根目录的文件 |
 | `modules/` | 框架里没有、只有你的站要的功能，做成模块放在这里，见 [架构](docs/architecture.md#模块) 的“模块” |
 
 最值得花时间的是评分标准（`industry/prompts/selection-score.md`）和门槛：拿一两百条你自己标注过的资料，用 `scripts/eval-selection.ts` 跑一遍，看它选得准不准，再回去改。怎么做写在 [精选与校准](docs/selection.md) 里。
@@ -163,6 +163,7 @@ docker compose up -d --build
 | [综述评测](docs/story-digest-evaluation.md) | 改事件综述提示词前，怎么在同一批事件上并排比较 |
 | [部署](docs/deploy.md) | Docker、域名和 HTTPS、中国大陆、更新、备份、花多少钱，不用 Docker 时在 Linux、macOS（Windows 用 WSL2）上怎么跑 |
 | [架构](docs/architecture.md) | 三个进程、几条不变的规则、目录、模块、数据库迁移、对外出口、测试 |
+| [架构导读](docs/architecture-overview.md) | 一页读完的汇总：拓扑、技术栈、目录、数据流、信源与定时任务、要守住的硬约束 |
 
 技术栈：Node.js 24 · TypeScript · React Router（服务端渲染）· Fastify · PostgreSQL · pg-boss · Tailwind CSS · Docker Compose。
 

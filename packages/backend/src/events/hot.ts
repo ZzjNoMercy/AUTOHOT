@@ -5,6 +5,7 @@ import { COMMUNITY_FEEDS } from "@aihot/site";
 import { sql, type Db } from "../db.ts";
 import { pickRepresentative, REPRESENTATIVE_COLUMNS, type RepresentativeIdentity } from "../publication/representative.ts";
 import { evidenceCondition, listedCondition } from "../publication/scope.ts";
+import { sourceGroupKey, sourceGroupName } from "../publication/source-identity.ts";
 
 /** One entry of a stored ranking; the public read layer (publication/hot.ts) re-checks it before showing it. */
 export interface HotEntry {
@@ -207,13 +208,19 @@ export async function computeHotRanking(at = new Date()): Promise<{ id: number; 
     const members = [...byFact.values()].sort((a, b) => sourceCount(b) - sourceCount(a) || firstSeen(a) - firstSeen(b) || a[0]!.fact_id - b[0]!.fact_id)[0]!;
     const selected = members.filter((report) => report.selected);
     const rep = pickRepresentative(selected.length ? selected : members);
-    const participants = await sql<{ name: string; kind: "editorial" | "signal"; tier: string; at: Date }[]>`
-      SELECT DISTINCT ON (cs.participant_key) s.name, cs.kind, s.tier, cs.observed_at AS at
+    const participants = await sql<{ id: string; name: string; kind: "editorial" | "signal"; source_kind: string; source_group_id: string | null; tier: string; at: Date }[]>`
+      SELECT DISTINCT ON (cs.participant_key) s.id, s.name, cs.kind, s.kind AS source_kind, s.source_group_id, s.tier, cs.observed_at AS at
       FROM ${currentSignals()} cs JOIN sources s ON s.id = cs.source_id
       WHERE cs.story_id = ${r.story_id} AND cs.observed_at > ${at}::timestamptz - make_interval(hours => ${WINDOW_HOURS}) AND cs.observed_at <= ${at}
       ORDER BY cs.participant_key, (cs.kind = 'editorial') DESC, cs.observed_at DESC`;
     // The reporting sources of the window, latest first (signal participants are counted separately).
     const reporting = participants.filter((p) => p.kind === "editorial").sort((x, y) => y.at.getTime() - x.at.getTime());
+    // Accounts of one source group count once in "来源", while each remains its own participant.
+    const sourceGroups = new Map<string, string>();
+    for (const p of reporting) {
+      const source = { id: p.id, name: p.name, kind: p.source_kind, source_group_id: p.source_group_id };
+      if (!sourceGroups.has(sourceGroupKey(source))) sourceGroups.set(sourceGroupKey(source), sourceGroupName(source));
+    }
     const heat = heatIndex(Number(r.heat));
     // The change against six hours before compares only participants whose sources were observed
     // throughout; with none of the earlier ones observed there is no comparison.
@@ -227,7 +234,7 @@ export async function computeHotRanking(at = new Date()): Promise<{ id: number; 
     if (surge) badges.push("surge");
     if (isNew) badges.push("new");
     if (!surge && pct !== null && pct > 0.15) badges.push("rising");
-    const sourceNames = [...new Set(reporting.map((x) => x.name))].slice(0, 8);
+    const sourceNames = [...sourceGroups.values()].slice(0, 8);
     entries.push({
       rank: entries.length + 1,
       storyId: r.story_id,
@@ -238,7 +245,7 @@ export async function computeHotRanking(at = new Date()): Promise<{ id: number; 
       trendPct: pct === null ? null : Math.round(pct * 1000) / 10,
       badges,
       participantCount: Number(r.participants),
-      sourceCount: Number(r.editorial_participants),
+      sourceCount: sourceGroups.size,
       signalCount: Number(r.signal_participants),
       reportCount: reports.length,
       sourceNames,

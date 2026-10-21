@@ -1,13 +1,13 @@
 import { useEffect } from "react";
 import { Link, redirect, useLoaderData, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/all";
-import type { PoolResponse } from "@aihot/contracts/site";
+import type { CompaniesResponse, PoolResponse } from "@aihot/contracts/site";
 import { SITE, subjectAfter } from "@aihot/site";
 import { beijingTime } from "@aihot/contracts/time";
 import { cachedPage, loadOr404 } from "../lib/api.server";
 import { pageReuse } from "../lib/page-reuse";
 import { filterParams, hasFeedFilters, itemListLd, listPath, pageMeta, readFilters } from "../lib/seo";
-import { ActiveFilters, CategoryTabs, FeedBar, SearchField } from "../features/feed/Filters";
+import { ActiveFilters, CategoryTabs, CompanyTabs, FeedBar, SearchField } from "../features/feed/Filters";
 import { PillTabs } from "../components/ui/Tabs";
 import { DayList, Pagination } from "../features/feed/DayList";
 import { EmptyState } from "../components/ui/Page";
@@ -29,14 +29,18 @@ export async function loader({ request }: Route.LoaderArgs) {
   const tab = url.searchParams.get("tab") === "relevance" ? "relevance" : null;
   // Older deep-paging parameters (deep, anchorAt) still open a normal page.
   const page = Math.min(Math.max(Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1, 1), 50);
-  const data = await loadOr404<PoolResponse>(
-    listPath("/api/site/pool", { ...filterParams(readFilters(url.searchParams)), q, tab, page: page > 1 ? page : null }),
-    // The busy page keeps the search, so it can be tried again as it was.
-    { signal: request.signal, busyRedirect: `/all/search-busy${url.search}` },
-  );
+  const [data, companies] = await Promise.all([
+    loadOr404<PoolResponse>(
+      listPath("/api/site/pool", { ...filterParams(readFilters(url.searchParams)), q, tab, page: page > 1 ? page : null }),
+      // The busy page keeps the search, so it can be tried again as it was.
+      { signal: request.signal, busyRedirect: `/all/search-busy${url.search}` },
+    ),
+    // The row of companies is an aid, the feed is the page: without its list the row simply is not shown.
+    loadOr404<CompaniesResponse>("/api/site/companies", { signal: request.signal }).catch((): CompaniesResponse => ({ companies: [] })),
+  ]);
   // Past the last page of what there is: the last page, with the same search and filters.
   if (data.total > 0 && data.page > data.pageCount) throw redirect(pageHref(url.searchParams, data.pageCount));
-  return cachedPage(60, { data });
+  return cachedPage(60, { data, companies });
 }
 
 export function meta({ loaderData }: Route.MetaArgs) {
@@ -67,7 +71,7 @@ function pageHref(params: URLSearchParams, page: number) {
 }
 
 export default function AllPage() {
-  const { data } = useLoaderData<typeof loader>();
+  const { data, companies } = useLoaderData<typeof loader>();
   const [params] = useSearchParams();
   const navigation = useNavigation();
   const f = data.filters;
@@ -81,7 +85,15 @@ export default function AllPage() {
     else sp.delete("tab");
     return `/all?${sp}`;
   };
-  const title = f.q ? `搜索“${f.q}”` : f.tag ? `#${f.tag}` : null;
+  // Dropping one filter keeps the others: the empty state's way out of a company with no content.
+  const withoutEntity = () => {
+    const sp = new URLSearchParams(params);
+    sp.delete("entity");
+    sp.delete("page");
+    const qs = sp.toString();
+    return qs ? `/all?${qs}` : "/all";
+  };
+  const title = f.q ? `搜索“${f.q}”` : f.entity ? f.entity.name : f.tag ? `#${f.tag}` : null;
   const updated = beijingTime(data.freshness);
   // Searches are remembered in this browser for the phone search (listed in the privacy notice).
   useEffect(() => {
@@ -106,9 +118,9 @@ export default function AllPage() {
           }
         />
       ) : (
-        <FeedBar base="/all" category={f.category} channel={f.channel} />
+        <FeedBar base="/all" category={f.category} channel={f.channel} entity={f.entity} companies={companies.companies} />
       )}
-      <ActiveFilters base="/all" category={f.category} channel={f.channel} tag={f.tag} />
+      <ActiveFilters base="/all" category={f.category} channel={f.channel} entity={f.entity} tag={f.tag} />
 
       {/* Desktop, as on 精选: the title, then one filter row with the search field aligned on the right. */}
       <div className="hidden lg:block">
@@ -117,6 +129,7 @@ export default function AllPage() {
           <CategoryTabs base="/all" category={f.category} channel={f.channel} layoutId="all-cat-desk" className="min-w-0" />
           <SearchField defaultValue={f.q ?? ""} keep={keep} />
         </div>
+        <CompanyTabs base="/all" entity={f.entity ?? null} companies={companies.companies} />
       </div>
 
       {f.q && (
@@ -140,11 +153,18 @@ export default function AllPage() {
             <EmptyState
               title="没有找到相关内容"
               action={
-                f.q && f.tab === "time" ? (
-                  <Link to={searchTabHref("relevance")} className="text-[13px] font-medium text-accent hover:underline">
-                    试试“全文相关”，连正文一起搜
-                  </Link>
-                ) : undefined
+                <>
+                  {f.entity && (
+                    <Link to={withoutEntity()} className="text-[13px] font-medium text-accent hover:underline">
+                      去掉公司筛选
+                    </Link>
+                  )}
+                  {f.q && f.tab === "time" && (
+                    <Link to={searchTabHref("relevance")} className="text-[13px] font-medium text-accent hover:underline">
+                      试试“全文相关”，连正文一起搜
+                    </Link>
+                  )}
+                </>
               }
             >
               {f.q ? "换个说法，或者去掉筛选再试。" : "这个筛选下暂时没有内容。"}

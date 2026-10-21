@@ -10,6 +10,7 @@ import { relatedEvidence, RELATED_MIN_REPORTS } from "../events/related.ts";
 import { pickRepresentative, REPRESENTATIVE_COLUMNS, type RepresentativeIdentity } from "./representative.ts";
 import { compositeCondition, evidenceCondition, listedCondition, storyReportCondition } from "./scope.ts";
 import { publicSourceName } from "./rules.ts";
+import { sourceGroupKey } from "./source-identity.ts";
 import { latestHotRanking, rankingExtras } from "./hot.ts";
 import { storyTexts } from "./story-text.ts";
 import { topicsOfStory } from "./topics.ts";
@@ -61,6 +62,8 @@ interface ReportRow extends RepresentativeIdentity {
   at: Date;
   source_id: string;
   source_name: string;
+  source_kind: string;
+  source_group_id: string | null;
   first_party: boolean;
   fact_id: number;
 }
@@ -74,13 +77,18 @@ interface ReportRow extends RepresentativeIdentity {
 async function storyReports(storyId: number, now: Date): Promise<ReportRow[]> {
   return sql<ReportRow[]>`
     SELECT DISTINCT ON (p.article_id) p.article_id AS id, p.title, p.summary, p.url, p.selected,
-      coalesce(p.published_at, p.discovered_at) AS at, s.id AS source_id, s.name AS source_name,
+      coalesce(p.published_at, p.discovered_at) AS at, s.id AS source_id, s.name AS source_name, s.kind AS source_kind, s.source_group_id,
       (s.tier = 'T1') AS first_party, f.id AS fact_id,
       CASE WHEN ${compositeCondition()} THEN 'mention' ELSE fa.role END AS role, p.body_mode, p.score, p.timeline_at, ${REPRESENTATIVE_COLUMNS}
     FROM facts f JOIN fact_articles fa ON fa.fact_id = f.id JOIN publications p ON p.article_id = fa.article_id
     JOIN sources s ON s.id = p.source_id
     WHERE f.story_id = ${storyId} AND ${storyReportCondition(now)}
     ORDER BY p.article_id, (fa.role = 'primary') DESC, (fa.role <> 'mention') DESC, f.id`;
+}
+
+/** Public sources behind the reports: accounts of one source group count once. */
+function sourceGroupCount(reports: ReportRow[]): number {
+  return new Set(reports.map((r) => sourceGroupKey({ id: r.source_id, name: r.source_name, kind: r.source_kind, source_group_id: r.source_group_id }))).size;
 }
 
 function reportView(r: ReportRow): StoryReportView {
@@ -173,7 +181,7 @@ export async function loadStoryDetail(storyId: number, now = new Date()): Promis
     title: s.title,
     status: storyStatusFor(latestAt, now.getTime()),
     reportCount: reports.length,
-    sourceCount: new Set(reports.map((r) => r.source_id)).size,
+    sourceCount: sourceGroupCount(reports),
     firstReportAt: firstReportAt.toISOString(),
     latestAt: latestAt.toISOString(),
     digest: text.digest,
@@ -326,7 +334,7 @@ export async function v1Story(storyId: number) {
       publicId: s.public_id,
       title: s.title,
       status: storyStatusFor(latestAt, now.getTime()) === "settled" ? ("settled" as const) : ("active" as const),
-      sourceCount: new Set(reports.map((r) => r.source_id)).size,
+      sourceCount: sourceGroupCount(reports),
       reportCount: reports.length,
       firstReportAt: firstReportAt.toISOString(),
       latestAt: latestAt.toISOString(),

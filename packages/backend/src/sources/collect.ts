@@ -77,7 +77,8 @@ async function store(sourceId: string, candidates: CollectionCandidate[], backfi
  * one interval later. A failure counts toward "failing" (5 in a row) and waits longer after each one,
  * up to six hours; a full budget is not the source's failure: it waits 15 minutes and counts nothing.
  */
-async function recordFetch(db: Db, sourceId: string, runId: number, run: { found: number; created: number; detail: object | null } & ({ cursor: Record<string, unknown> } | { error: string; budget: boolean })): Promise<void> {
+/** 写 fetch_runs 并更新信源健康/退避；模块自己的采集器也用它，别各写一份。 */
+export async function recordFetch(db: Db, sourceId: string, runId: number, run: { found: number; created: number; detail: object | null } & ({ cursor: Record<string, unknown> } | { error: string; budget: boolean })): Promise<void> {
   const detail = run.detail ? db.json(run.detail as never) : null;
   if ("cursor" in run) {
     await db`
@@ -104,8 +105,9 @@ export async function collectSource(sourceId: string, opts: { force?: boolean } 
   const source = await loadSource(sourceId);
   if (!source) return { sourceId, status: "skipped", found: 0, created: 0, revised: 0, error: "missing" };
   if (!source.enabled && !opts.force) return { sourceId, status: "skipped", found: 0, created: 0, revised: 0, error: "paused" };
-  if (source.kind === "mp_account" || source.kind === "external") {
-    // WeChat accounts are reconciled by the mp job; external sources only receive reports.
+  if (source.kind === "mp_account" || source.kind === "external" || source.kind === "weibo") {
+    // WeChat accounts are reconciled by the mp job; external and 微博 sources only receive reports
+    // (the module behind the kind collects them, see module.ts sourceKinds).
     return { sourceId, status: "skipped", found: 0, created: 0, revised: 0 };
   }
 

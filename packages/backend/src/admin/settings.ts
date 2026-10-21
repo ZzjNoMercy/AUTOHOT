@@ -1,6 +1,7 @@
-// Operator settings: about-page QR codes (replaced without a release), notification targets
-// (switching a group on records enabled_at so older content is never back-filled) and per-service
-// request budgets (the circuit breaker paid calls check before sending).
+// Operator settings: about-page QR codes (replaced without a release), paid collection keys (saved
+// without a restart, masked in the API and the audit log), notification targets (switching a group on
+// records enabled_at so older content is never back-filled), per-service request budgets (the circuit
+// breaker paid calls check before sending) and each module's part of the page.
 import type { AdminBudget, AdminNotifyTarget, AdminSettings, BeforeJson } from "@aihot/contracts/admin";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -8,6 +9,8 @@ import sharp from "sharp";
 import { config } from "../config.ts";
 import { sql } from "../db.ts";
 import { sha256 } from "../lib/ids.ts";
+import { serverModules } from "../modules.ts";
+import { providerKeyStates } from "../providers/keys.ts";
 import { loadContact, type ContactSettings } from "../site/contact.ts";
 import { audit } from "../audit.ts";
 
@@ -32,10 +35,16 @@ export async function replaceContactQr(input: { slot: keyof ContactSettings; dat
   return next;
 }
 
-/** The settings page: contact QR codes, content push targets and paid-service budgets. */
+/** The settings page: contact QR codes, paid-service keys, content push targets, paid-service budgets and each module's part. */
 export async function settingsOverview(): Promise<BeforeJson<AdminSettings>> {
-  const [contact, targets, budgets] = await Promise.all([loadContact(), listTargets(), listBudgets()]);
-  return { contact, targets, budgets };
+  const [contact, providers, targets, budgets, modules] = await Promise.all([
+    loadContact(),
+    providerKeyStates(),
+    listTargets(),
+    listBudgets(),
+    Promise.all(serverModules().flatMap((m) => (m.admin?.settings ? [m.admin.settings().then((part) => [m.name, part] as const)] : []))),
+  ]);
+  return { contact, providers, targets, budgets, modules: Object.fromEntries(modules) };
 }
 
 export async function listTargets(): Promise<BeforeJson<AdminNotifyTarget>[]> {

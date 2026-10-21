@@ -5,6 +5,11 @@ import type { CategoryKey, ChannelKey } from "./taxonomy.ts";
 export interface SourceRef {
   /** The name readers see (publication/rules.ts publicSourceName), as is every source name here. */
   name: string;
+  /**
+   * The account's avatar, for sources that are an account rather than an outlet (weibo); a proxied
+   * URL. News sources keep their name alone, as they always have.
+   */
+  avatarUrl?: string | null;
 }
 
 export interface MediaView {
@@ -52,12 +57,17 @@ export interface ItemSummary {
   tags: string[];
   score: number | null;
   selected: boolean;
-  channel: "news" | "x";
+  channel: ChannelKey;
+  /**
+   * The companies the material's analysis named (subject ids and their names). The card links these to
+   * the company filter, as it does a topic; the free-form tags stay separate.
+   */
+  companies: EntityFilter[];
   story: StoryRef | null;
 }
 
 /** The fields rendered by a site feed card; full original text lives in the item detail. */
-export interface FeedItemSummary extends Pick<ItemSummary, "id" | "title" | "summary" | "reason" | "source" | "publishedAt" | "timelineAt" | "category" | "tags" | "score" | "selected" | "channel"> {
+export interface FeedItemSummary extends Pick<ItemSummary, "id" | "title" | "summary" | "reason" | "source" | "publishedAt" | "timelineAt" | "category" | "tags" | "score" | "selected" | "channel" | "companies"> {
   x: (Pick<XPostView, "authorName" | "handle" | "avatarUrl" | "avatarSrcSet" | "media"> & {
     quoted: Omit<NonNullable<XPostView["quoted"]>, "url"> | null;
   }) | null;
@@ -102,7 +112,27 @@ export interface HotStripEntry {
 export interface TimelineFilters {
   channel: ChannelKey;
   category: CategoryKey | null;
+  /** The company filter (a subject id from the industry's entity dictionary); absent means none. */
+  entity?: EntityFilter | null;
   tag: string | null;
+}
+
+/** The company a feed is filtered by: the stored subject id and the name readers know it by. */
+export interface EntityFilter {
+  id: string;
+  name: string;
+}
+
+/** One row of the company filter's list: companies with content now, most first. */
+export interface CompanyOption {
+  id: string;
+  name: string;
+  /** Listed items of this company in the window the list counts. */
+  count: number;
+}
+
+export interface CompaniesResponse {
+  companies: CompanyOption[];
 }
 
 export interface TimelineResponse {
@@ -336,29 +366,6 @@ export interface ReportLatestPage {
 /** A report's archive selector, or one month of the daily archive. */
 export interface ReportNavigationResponse {
   items: ReportNavigationEntry[];
-}
-
-/** Site-wide facts for the web shell: the changelog red-dot anchor. */
-export interface SiteMeta {
-  changelogVersion: string;
-}
-
-/** One entry of the site's changelog (site/changelog.json), newest first. */
-export interface ChangelogRelease {
-  date: string;
-  time: string;
-  kind: "更新" | "优化" | "公告" | "下线";
-  title: string;
-  body: string[];
-  /** A notice readers must act on: drawn in the warning red so it cannot be skimmed past. */
-  urgent?: true;
-  /** A major release's long form, drawn by the site's own drawing when it ships one; its shape is the site's. */
-  feature?: unknown;
-}
-
-export interface ChangelogResponse {
-  latestVersion: string;
-  releases: ChangelogRelease[];
 }
 
 /**

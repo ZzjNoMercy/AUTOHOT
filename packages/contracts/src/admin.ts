@@ -50,7 +50,7 @@ export const REPLACEABLE_SOURCE_KINDS = ["rss", "web_list", "json_list"] as cons
 export type ReplaceableSourceKind = typeof REPLACEABLE_SOURCE_KINDS[number];
 
 export interface AdminSourceUpdate {
-  patch: Partial<Pick<AdminSource, "name" | "enabled" | "interval_minutes" | "tier" | "participation_mode" | "signal_group_id" | "first_party" | "owner_entity_id" | "site_fulltext" | "syndicate_fulltext" | "tags">> & (
+  patch: Partial<Pick<AdminSource, "name" | "enabled" | "interval_minutes" | "tier" | "participation_mode" | "signal_group_id" | "source_group_id" | "first_party" | "owner_entity_id" | "site_fulltext" | "syndicate_fulltext" | "tags">> & (
     { kind?: never; config?: Record<string, unknown> } | { kind: ReplaceableSourceKind; config: Record<string, unknown> }
   );
   version: string;
@@ -93,6 +93,7 @@ export interface AdminSource {
   tier: string;
   participation_mode: string;
   signal_group_id: string | null;
+  source_group_id: string | null;
   interval_minutes: number;
   site_fulltext: boolean;
   syndicate_fulltext: boolean;
@@ -321,6 +322,19 @@ export interface AdminSettings {
   contact: { wechatQr: string | null; feishuQr: string | null };
   targets: AdminNotifyTarget[];
   budgets: AdminBudget[];
+  providers: AdminProviderKey[];
+  /** Each module's part of the page, under its name (what its server module's admin.settings returns). */
+  modules: Record<string, unknown>;
+}
+
+/** A paid collection service's key as the settings page sees it: never the value, only a mask. */
+export interface AdminProviderKey {
+  /** The environment variable's name, e.g. DAJIALA_KEY. */
+  name: string;
+  /** Where the key comes from now: saved on the settings page, the environment, or nowhere (null). */
+  from: "admin" | "env" | null;
+  /** The key's masked tail, for telling versions apart. */
+  masked: string | null;
 }
 
 // Models and evaluation

@@ -15,7 +15,7 @@ const at = "2026-10-04T08:00:00.000Z";
 const earlier = "2026-10-03T08:00:00.000Z";
 
 function summaryOf(id: string, title: string, timelineAt = at): FeedItemSummary {
-  return { id, title, summary: "固定摘要", reason: "固定推荐理由", source: { name: "Fixture" }, publishedAt: timelineAt, timelineAt, category: "ai-models", tags: [], score: 80, selected: true, channel: "news", x: null };
+  return { id, title, summary: "固定摘要", reason: "固定推荐理由", source: { name: "Fixture" }, publishedAt: timelineAt, timelineAt, category: "new-car", tags: [], score: 80, selected: true, channel: "news", companies: [], x: null };
 }
 
 function detailOf(id: string, title: string): SiteItemDetail {
@@ -45,7 +45,6 @@ const api = createServer((req, res) => {
   const url = new URL(req.url!, "http://local");
   const p = url.pathname;
   res.setHeader("Content-Type", "application/json");
-  if (p === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: "fixture" }));
   if (p === "/api/site/track") { res.statusCode = 204; return res.end(); }
   if (p === "/api/health") return res.end("{}");
   if (p === "/api/site/topics") return res.end(JSON.stringify({ groups: [], topics: [] }));

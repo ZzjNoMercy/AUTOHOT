@@ -10,7 +10,6 @@ const upstreamPaths: string[] = [];
 const api = createServer((req, res) => {
   upstreamPaths.push(req.url ?? "");
   res.setHeader("Content-Type", "application/json");
-  if (req.url === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: null }));
   if (req.url?.startsWith("/api/site/timeline")) return res.end(JSON.stringify({
     cards: [], nextCursor: null, dayCounts: {}, hot: [], filters: { category: null, channel: null, tag: null },
   }));
@@ -39,7 +38,7 @@ test("origin-form slashes keep the router's homepage and unknown-route semantics
   for (const method of ["GET", "HEAD"] as const) {
     const home = await raw("/", method);
     assert.equal(home.status, 200, web.logs());
-    for (const path of ["//", "////", "//?category=ai-models"]) {
+    for (const path of ["//", "////", "//?category=new-car"]) {
       const res = await raw(path, method);
       assert.equal(res.status, 200, `${method} ${path}: ${web.logs()}`);
       assert.equal(res.headers["content-type"], home.headers["content-type"]);

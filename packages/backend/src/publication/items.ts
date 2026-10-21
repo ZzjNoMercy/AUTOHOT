@@ -8,6 +8,7 @@ import { isEmptyOrLinkOnly } from "../content/posts.ts";
 import { proxiedImage, proxiedImageSet } from "../media/imgproxy.ts";
 import { sourceOwnsPost } from "../sources/account.ts";
 import { displayTags, publicSourceName } from "./rules.ts";
+import { ENTITIES } from "../editorial/vocabulary.ts";
 import { foldableSelectionCondition, seatedCondition } from "./scope.ts";
 
 export interface ItemRow {
@@ -20,7 +21,7 @@ export interface ItemRow {
   tags: string[];
   score: number | null;
   selected: boolean;
-  channel: "news" | "x";
+  channel: ChannelKey;
   url: string;
   published_at: Date | null;
   discovered_at: Date;
@@ -52,7 +53,8 @@ export const ITEM_COLUMNS = sql`
   p.selected, p.seat, p.channel, p.url, p.published_at, p.discovered_at, p.timeline_at, p.visibility,
   p.body_mode, p.indexable, p.fact_id, s.name AS source_name, s.participation_mode AS source_mode,
   a.x_post, a.author, a.language,
-  CASE WHEN s.kind = 'x_search' AND ${sourceOwnsPost(sql`s.name`, sql`a.x_post->>'handle'`)} THEN s.icon_url END AS author_avatar_url,
+  CASE WHEN s.kind = 'x_search' AND ${sourceOwnsPost(sql`s.name`, sql`a.x_post->>'handle'`)} THEN s.icon_url
+       WHEN s.kind = 'weibo' THEN s.icon_url END AS author_avatar_url,
   st.public_id::text AS story_public_id, st.title AS story_title,
   CASE WHEN p.channel = 'x' THEN tr.body_text END AS zh_text, qt.text_zh AS quoted_zh`;
 
@@ -83,6 +85,16 @@ export function channelCondition(channel: ChannelKey | null | undefined) {
 export function categoryCondition(category: CategoryKey | null | undefined) {
   if (!category) return sql``;
   return sql`AND p.category = ${category}`;
+}
+
+/**
+ * The company filter: items whose analysis named this company (a subject id from the industry's
+ * dictionary, stored as the `entity:<id>` tag at publish time). A company the dictionary does not
+ * have simply matches nothing.
+ */
+export function entityCondition(entityId: string | null | undefined) {
+  if (!entityId) return sql``;
+  return sql`AND p.tags @> ${[`entity:${entityId}`]}::text[]`;
 }
 
 /** The public API's, RSS's and MCP's filter: every category the site publishes as this one (PUBLIC_CATEGORIES). */
@@ -148,15 +160,41 @@ export function showsPost(row: { channel: string; body_mode: string }): boolean 
   return row.channel === "x" && (!POLICY.xPostIsFullText || row.body_mode === "full");
 }
 
+/** The companies this item's analysis named, in the order the tags carry them. */
+export function companiesOf(tags: string[]): Array<{ id: string; name: string }> {
+  const out: Array<{ id: string; name: string }> = [];
+  for (const tag of tags) {
+    if (!tag.startsWith("entity:")) continue;
+    const id = tag.slice("entity:".length);
+    const entity = ENTITIES[id];
+    // A company the dictionary no longer knows (the admin retired it) is not shown as a chip.
+    if (entity && !out.some((c) => c.id === id)) out.push({ id, name: entity.name });
+  }
+  return out;
+}
+
+/**
+ * A subject's own display name is already shown as its company chip: keeping it in the tag list too
+ * would print the same company twice and link to the weaker, free-form tag filter.
+ */
+function tagListOf(row: ItemRow): string[] {
+  const companies = companiesOf(row.tags);
+  const shown = new Set(companies.flatMap((c) => [c.id, (ENTITIES[c.id]?.displayTag ?? "")].filter(Boolean)));
+  return displayTags(row.tags).filter((t) => !shown.has(t));
+}
+
 /** The shared public article; its X post is added as each answer shows it. */
 export function toItemSummary(row: ItemRow): ItemSummary {
+  // A 微博 account is a person, not an outlet: its card and page carry the account's avatar, the way
+  // an X post does. News sources keep the name alone.
+  const avatar = row.channel === "weibo" ? proxiedImage(row.author_avatar_url, "avatar") : null;
   return {
     id: row.id,
     title: row.title,
     originalTitle: row.original_title,
     summary: row.summary,
     reason: row.selected ? row.reason : null,
-    source: { name: publicSourceName(row.source_name) },
+    source: { name: publicSourceName(row.source_name), ...(avatar ? { avatarUrl: avatar } : {}) },
     links: { original: row.url },
     publishedAt: row.published_at?.toISOString() ?? null,
     discoveredAt: row.discovered_at.toISOString(),
@@ -166,6 +204,7 @@ export function toItemSummary(row: ItemRow): ItemSummary {
     score: row.score === null ? null : Math.round(Number(row.score)),
     selected: row.selected,
     channel: row.channel,
+    companies: companiesOf(row.tags),
     story: row.story_public_id ? { publicId: row.story_public_id, title: row.story_title ?? "" } : null,
   };
 }
@@ -177,7 +216,8 @@ export function toFeedItemSummary(row: ItemRow): FeedItemSummary {
   return {
     id: item.id, title: item.title, summary: item.summary ?? (x?.text || null), reason: item.reason,
     source: item.source, publishedAt: item.publishedAt, timelineAt: item.timelineAt,
-    category: item.category, tags: item.tags, score: item.score, selected: item.selected, channel: item.channel,
+    category: item.category, tags: tagListOf(row), score: item.score, selected: item.selected, channel: item.channel,
+    companies: item.companies,
     x: x ? {
       authorName: x.authorName, handle: x.handle, avatarUrl: x.avatarUrl,
       ...(x.avatarSrcSet ? { avatarSrcSet: x.avatarSrcSet } : {}), media: x.media,

@@ -3,6 +3,7 @@
 // as the actual cost. Docs: https://s.apifox.cn/410674f9-f451-4b4f-957a-5f54f243bc83
 import { credential } from "../config.ts";
 import { guardedFetch } from "../lib/http-fetch.ts";
+import { providerKey } from "./keys.ts";
 import { assertAccepted, paidRequest, ProviderRejectedError, type CallOutcome } from "./receipts.ts";
 
 export interface MpPost {
@@ -35,15 +36,16 @@ export interface MpArticle {
 }
 
 /**
- * Whether WeChat accounts are checked through Dajiala: only with DAJIALA_KEY. The scheduled checks and
- * their queue run only then.
+ * Whether WeChat accounts are checked through Dajiala: only with a key, whether an operator saved it on
+ * the settings page or it comes from the environment. The scheduled checks only enqueue when it is set,
+ * so saving a key starts collecting at the next reconcile.
  */
-export function dajialaConfigured(): boolean {
-  return credential("collectors", "DAJIALA_KEY") !== null;
+export async function dajialaConfigured(): Promise<boolean> {
+  return (await providerKey("DAJIALA_KEY")) !== null;
 }
 
-function base(): { url: string; key: string } {
-  const key = credential("collectors", "DAJIALA_KEY");
+async function base(): Promise<{ url: string; key: string }> {
+  const key = await providerKey("DAJIALA_KEY");
   if (!key) throw new Error("DAJIALA_KEY is not configured");
   return { url: (credential("collectors", "DAJIALA_BASE_URL") ?? "https://www.dajiala.com").replace(/\/$/, ""), key };
 }
@@ -58,7 +60,7 @@ function outcomeOf(json: { code?: number; msg?: string; cost_money?: number }, l
 
 /** Latest posts of one account (first page, newest first). `window` buckets the receipt identity. */
 export async function mpHistory(ghid: string, opts: { subject: string; window: string }): Promise<MpHistory> {
-  const { url, key } = base();
+  const { url, key } = await base();
   const receipt = await paidRequest(
     { service: "dajiala", purpose: "mp_history", subject: opts.subject, identity: { ghid, window: opts.window }, requestSummary: { ghid } },
     async () => {
@@ -82,7 +84,7 @@ export async function mpHistory(ghid: string, opts: { subject: string; window: s
 
 /** Plain-text body of one article (mode 1: text with image markers). */
 export async function mpArticle(articleUrl: string, opts: { subject: string; identity: string }): Promise<MpArticle> {
-  const { url, key } = base();
+  const { url, key } = await base();
   const receipt = await paidRequest(
     { service: "dajiala", purpose: "mp_article", subject: opts.subject, identity: { article: opts.identity }, requestSummary: { url: articleUrl } },
     async () => {

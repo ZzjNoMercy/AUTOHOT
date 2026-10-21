@@ -28,14 +28,13 @@ const api = createServer((req, res) => {
   }
   if (url.pathname === "/video/unsupported") { unsupportedRequests++; res.writeHead(404); return res.end(); }
   res.setHeader("Content-Type", "application/json");
-  if (url.pathname === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: "fixture" }));
   if (url.pathname === "/api/site/track") { res.statusCode = 204; return res.end(); }
   if (url.pathname === "/api/health") return res.end("{}");
   if (url.pathname === "/api/site/items/video-fixture") {
     const detail: SiteItemDetail = {
       id: "video-fixture", title: "原生视频检查", summary: "固定摘要", reason: "固定推荐理由", source: { name: "Fixture" },
-      publishedAt: at, timelineAt: at, discoveredAt: at, category: "ai-models", tags: [], score: 80, selected: true,
-      channel: "news", x: null, originalTitle: "Video fixture", links: { original: "https://example.org/article" },
+      publishedAt: at, timelineAt: at, discoveredAt: at, category: "new-car", tags: [], score: 80, selected: true,
+      channel: "news", companies: [], x: null, originalTitle: "Video fixture", links: { original: "https://example.org/article" },
       story: null, readingMode: "full", author: null, outline: [], relatedStories: [], topics: [], indexable: true,
       markdownAvailable: true, group: null, hasTranslation: true, bodyLanguage: "zh",
       body: { zh: `<p>点击浏览器原生按钮播放视频。</p><video controls playsinline preload="none" width="320" height="320"><source src="${url.origin}/video/unsupported" type="video/not-supported"><source src="${url.origin}/video/clip.webm" type="video/webm"></video>`, original: null, zhKind: "translation", complete: true },

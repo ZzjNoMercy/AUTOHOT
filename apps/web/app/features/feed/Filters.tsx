@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Form, Link, useNavigation, useSearchParams } from "react-router";
 import { CATEGORY_KEYS, CATEGORY_LABELS, CHANNEL_LABELS, type CategoryKey, type ChannelKey } from "@aihot/contracts/taxonomy";
+import type { CompanyOption, EntityFilter } from "@aihot/contracts/site";
 import { SITE } from "@aihot/site";
-import { IconCheck, IconClose, IconFilter, IconSearch } from "../../components/icons";
+import { IconCheck, IconChevronDown, IconClose, IconFilter, IconSearch } from "../../components/icons";
 import { PillTabs } from "../../components/ui/Tabs";
 import { Sheet } from "../../components/ui/Sheet";
 import { Wordmark } from "@aihot/site/brand/Logo.tsx";
@@ -41,17 +42,25 @@ function filterKey(category: CategoryKey | null, channel: ChannelKey): string {
   return channel === "firstParty" ? "firstParty" : (category ?? "all");
 }
 
-/** Desktop: the filter as a row of tabs beside the search field. */
+/**
+ * Desktop: the filter as a row of tabs beside the search field. It carries the same label as the
+ * company row under it (类别 / 公司), so the two rows read as two dimensions rather than two lists.
+ */
 export function CategoryTabs({ base, category, channel = "all", layoutId, className = "" }: { base: string; category: CategoryKey | null; channel?: ChannelKey; layoutId: string; className?: string }) {
   const [params] = useSearchParams();
-  return <PillTabs items={filterOptions(base, params, "全部").map(o => ({ ...o, prefetch: 'intent' as const }))} active={filterKey(category, channel)} layoutId={layoutId} label="筛选" className={className} />;
+  return (
+    <div className={`flex min-w-0 items-center gap-3 ${className}`}>
+      <span className="shrink-0 text-[13px] font-medium text-ink-3">类别</span>
+      <PillTabs items={filterOptions(base, params, "全部").map(o => ({ ...o, prefetch: 'intent' as const }))} active={filterKey(category, channel)} layoutId={layoutId} label="按类别筛选" className="min-w-0" />
+    </div>
+  );
 }
 
 /**
  * The phone bar of 精选 and 全部: the brand, the 精选 | 全部 switch (a filter in use carries over), and
  * buttons for the filter sheet and search.
  */
-export function FeedBar({ base, category, channel }: { base: "/" | "/all"; category: CategoryKey | null; channel: ChannelKey }) {
+export function FeedBar({ base, category, channel, entity = null, companies = [] }: { base: "/" | "/all"; category: CategoryKey | null; channel: ChannelKey; entity?: EntityFilter | null; companies?: CompanyOption[] }) {
   const [params] = useSearchParams();
   const [sheet, setSheet] = useState(false);
   const scope = (to: string) => hrefWith(to, params, { q: null, tab: null, search: null });
@@ -86,14 +95,15 @@ export function FeedBar({ base, category, channel }: { base: "/" | "/all"; categ
           </>
         }
       />
-      <FilterSheet open={sheet} onClose={() => setSheet(false)} base={base} active={filterKey(category, channel)} />
+      <FilterSheet open={sheet} onClose={() => setSheet(false)} base={base} active={filterKey(category, channel)} entity={entity} companies={companies} />
     </>
   );
 }
 
 /** Phones: the filter as a sheet of options, the one in use ticked; choosing one applies it. */
-function FilterSheet({ open, onClose, base, active }: { open: boolean; onClose: () => void; base: string; active: string }) {
+function FilterSheet({ open, onClose, base, active, entity, companies }: { open: boolean; onClose: () => void; base: string; active: string; entity: EntityFilter | null; companies: CompanyOption[] }) {
   const [params] = useSearchParams();
+  const row = (on: boolean) => `-mx-2 flex h-12 items-center justify-between rounded-tile px-2 text-[16px] transition-colors active:bg-bg-sunk ${on ? "font-semibold text-accent" : "text-ink"}`;
   return (
     <Sheet open={open} onClose={onClose} title="筛选">
       <ul className="mx-4 divide-y divide-line-soft">
@@ -105,7 +115,7 @@ function FilterSheet({ open, onClose, base, active }: { open: boolean; onClose: 
                 to={o.to}
                 onClick={onClose}
                 aria-current={on ? "true" : undefined}
-                className={`-mx-2 flex h-12 items-center justify-between rounded-tile px-2 text-[16px] transition-colors active:bg-bg-sunk ${on ? "font-semibold text-accent" : "text-ink"}`}
+                className={row(on)}
               >
                 {o.label}
                 {on && <IconCheck size={19} strokeWidth={2.2} />}
@@ -114,29 +124,110 @@ function FilterSheet({ open, onClose, base, active }: { open: boolean; onClose: 
           );
         })}
       </ul>
+      {companies.length > 0 && (
+        <>
+          <h3 className="mx-4 mb-1 mt-5 text-[13px] font-semibold text-ink-3">公司</h3>
+          <ul className="mx-4 divide-y divide-line-soft">
+            {([null, ...companies] as Array<CompanyOption | null>).map((c, i) => {
+              const on = c ? c.id === entity?.id : !entity;
+              return (
+                <li key={c?.id ?? `none-${i}`}>
+                  <Link to={hrefWith(base, params, { entity: c?.id ?? null })} onClick={onClose} aria-current={on ? "true" : undefined} className={row(on)}>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate">{c?.name ?? "不限"}</span>
+                      {!!c?.count && <span className="num text-[13px] text-ink-4">{c.count}</span>}
+                    </span>
+                    {on && <IconCheck size={19} strokeWidth={2.2} />}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </Sheet>
   );
 }
 
-/** Phones: the filter and tag in use as chips under the bar; each one clears itself when tapped. */
-export function ActiveFilters({ base, category, channel, tag }: { base: string; category: CategoryKey | null; channel: ChannelKey; tag: string | null }) {
+/** The filters in use, as chips under the bar; each one clears itself when tapped. */
+export function ActiveFilters({ base, category, channel, entity = null, tag }: { base: string; category: CategoryKey | null; channel: ChannelKey; entity?: EntityFilter | null; tag: string | null }) {
   const [params] = useSearchParams();
   const label = channel === "firstParty" ? CHANNEL_LABELS.firstParty : category ? CATEGORY_LABELS[category] : null;
-  if (!label && !tag) return null;
-  const chip = "inline-flex min-h-11 max-w-full items-center gap-1 rounded-full bg-accent-soft pl-3 pr-2 text-[13px] font-medium text-accent transition-opacity active:opacity-60";
+  const q = params.get("q")?.trim() ?? "";
+  const chips: Array<{ key: string; text: string; clear: Record<string, string | null> }> = [];
+  if (label) chips.push({ key: "scope", text: `只看${label}`, clear: { category: null, channel: null } });
+  if (entity) chips.push({ key: "entity", text: `公司：${entity.name}`, clear: { entity: null } });
+  if (tag) chips.push({ key: "tag", text: `#${tag}`, clear: { tag: null } });
+  if (q) chips.push({ key: "q", text: `搜索：${q}`, clear: { q: null } });
+  if (!chips.length) return null;
+  const chip = "inline-flex min-h-11 max-w-full items-center gap-1 rounded-full bg-accent-soft pl-3 pr-2 text-[13px] font-medium text-accent transition-opacity active:opacity-60 lg:min-h-8 lg:pl-2.5 lg:text-[12.5px]";
   return (
-    <div className="flex flex-wrap gap-2 pb-3 pt-1 lg:hidden">
-      {label && (
-        <Link to={hrefWith(base, params, { category: null, channel: null })} aria-label={`取消筛选：${label}`} className={chip}>
-          只看{label}
-          <IconClose size={14} strokeWidth={2} />
-        </Link>
-      )}
-      {tag && (
-        <Link to={hrefWith(base, params, { tag: null })} aria-label={`取消标签：${tag}`} className={chip}>
-          <span className="truncate">#{tag}</span>
+    <div className="flex flex-wrap items-center gap-2 pb-3 pt-1">
+      {chips.map((c) => (
+        <Link key={c.key} to={hrefWith(base, params, c.clear)} aria-label={`取消：${c.text}`} className={chip}>
+          <span className="truncate">{c.text}</span>
           <IconClose size={14} strokeWidth={2} className="shrink-0" />
         </Link>
+      ))}
+      {chips.length > 1 && (
+        <Link to={hrefWith(base, params, { category: null, channel: null, entity: null, tag: null, q: null })} className="text-[13px] text-ink-3 underline-offset-2 transition-colors hover:text-accent hover:underline">
+          全部清空
+        </Link>
+      )}
+    </div>
+  );
+}
+
+/** How many companies the row shows before 更多公司. */
+const COMPANY_ROW = 9;
+
+/**
+ * The company row: its own dimension beside the categories, so a reader can narrow to one company
+ * without giving up the category. Only companies with content are offered, most content first.
+ */
+export function CompanyTabs({ base, entity, companies }: { base: string; entity: EntityFilter | null; companies: CompanyOption[] }) {
+  const [params] = useSearchParams();
+  const [open, setOpen] = useState(false);
+  if (!companies.length) return null;
+  const more = companies.length > COMPANY_ROW;
+  const shown = open || !more ? companies : companies.slice(0, COMPANY_ROW);
+  return (
+    <div className="mb-4 hidden items-center gap-3 lg:flex">
+      <span className="shrink-0 text-[13px] font-medium text-ink-3">公司</span>
+      <PillTabs
+        size="sm"
+        layoutId="company-row"
+        label="按公司筛选"
+        active={entity?.id ?? ""}
+        wrap={open}
+        className="min-w-0"
+        items={[
+          { key: "", label: "不限", to: hrefWith(base, params, { entity: null }), prefetch: "intent" as const },
+          ...shown.map((c) => ({
+            key: c.id,
+            label: (
+              <span className="flex items-center gap-1">
+                {c.name}
+                <span className="num text-[11.5px] text-ink-4">{c.count}</span>
+              </span>
+            ),
+            to: hrefWith(base, params, { entity: c.id }),
+            prefetch: "intent" as const,
+          })),
+        ]}
+      />
+      {more && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={open ? "收起公司" : "展开全部公司"}
+          title={open ? "收起" : "全部公司"}
+          className="grid size-8 shrink-0 place-items-center rounded-full text-ink-4 transition-colors hover:bg-bg-sunk hover:text-ink-2 lg:size-7"
+        >
+          {/* Opening wraps the rest of the list onto the lines below: the arrow points down, then up. */}
+          <IconChevronDown size={15} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        </button>
       )}
     </div>
   );

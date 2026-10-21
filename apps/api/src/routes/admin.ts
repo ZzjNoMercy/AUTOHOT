@@ -15,6 +15,7 @@ import { requeueFailedArticles, runsOverview } from "@aihot/backend/admin/runs";
 import { resolveDelivery } from "@aihot/backend/notify/deliver";
 import { releaseReceipt } from "@aihot/backend/operations/recover";
 import { replaceContactQr, setTargetEnabled, settingsOverview, updateBudget } from "@aihot/backend/admin/settings";
+import { clearProviderKey, isProviderKeyName, saveProviderKey } from "@aihot/backend/providers/keys";
 import { createSource, fetchNow, listSources, previewSource, previewStoredSource, sourceDetail, updateSource } from "@aihot/backend/admin/sources";
 import { sendProblem } from "../http/respond.ts";
 import { adminHandler } from "./admin-auth.ts";
@@ -99,6 +100,14 @@ export function registerAdmin(app: FastifyInstance) {
   app.post("/api/admin/settings/contact-qr", adminHandler(async (req, _reply, admin) => {
     const b = body<{ slot: "wechatQr" | "feishuQr"; image: string }>(req);
     return replaceContactQr({ slot: b.slot, data: decodeImage(b.image) }, actorOf(admin));
+  }));
+  app.post("/api/admin/settings/provider-key", adminHandler(async (req, _reply, admin) => {
+    const b = body<{ name: string; value: string | null }>(req);
+    const name = String(b.name ?? "");
+    if (!isProviderKeyName(name)) throw Object.assign(new Error("unknown provider key"), { statusCode: 400 });
+    return b.value === null || b.value === undefined
+      ? await clearProviderKey(name, actorOf(admin))
+      : await saveProviderKey(name, String(b.value), actorOf(admin));
   }));
   app.post("/api/admin/notify-targets/:key", adminHandler(async (req, reply, admin) => {
     const b = body<{ enabled: boolean; reason: string }>(req);

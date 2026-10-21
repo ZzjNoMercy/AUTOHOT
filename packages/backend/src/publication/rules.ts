@@ -21,7 +21,8 @@ export interface SourceFacts {
   syndicate_fulltext: boolean;
 }
 
-export function channelOf(sourceKind: string, hasXPost: boolean): "x" | "news" {
+export function channelOf(sourceKind: string, hasXPost: boolean): "x" | "weibo" | "news" {
+  if (sourceKind === "weibo") return "weibo";
   return sourceKind === "x_search" || hasXPost ? "x" : "news";
 }
 

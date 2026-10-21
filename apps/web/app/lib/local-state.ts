@@ -9,7 +9,6 @@ export const KEYS = {
   read: "aihot-read-items",
   theme: "aihot-theme",
   font: "aihot-font",
-  changelogSeen: "aihot-changelog-seen-version",
   feedbackDraft: "aihot-feedback-draft-v1",
   recentSearches: "aihot-recent-searches",
 } as const;
@@ -115,7 +114,6 @@ const subscribeStarred = subscribeKey(KEYS.starred);
 const subscribeRead = subscribeKey(KEYS.read);
 const subscribeTheme = subscribeKey(KEYS.theme);
 const subscribeFont = subscribeKey(KEYS.font);
-const subscribeChangelog = subscribeKey(KEYS.changelogSeen);
 const subscribeRecentSearches = subscribeKey(KEYS.recentSearches);
 
 // Snapshot cache so useSyncExternalStore gets stable references between changes.
@@ -310,17 +308,6 @@ export function useAppearanceSync() {
 /** Inline script run before paint so the first frame already has the reader's appearance. */
 export const APPEARANCE_BOOT_SCRIPT = `(function(){var f='system';try{f=localStorage.getItem('${KEYS.font}')==='browser'?'browser':'system'}catch(e){}document.documentElement.setAttribute('data-font',f);try{var t=localStorage.getItem('${KEYS.theme}');if(t==='light'||t==='dark'){var c=t==='dark'?'${THEME_COLOR.dark}':'${THEME_COLOR.light}';document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.content=c})}else{t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','light')}})();`;
 
-// changelog red dot
-function getChangelogSeen(): string | null {
-  const v = readRaw(KEYS.changelogSeen);
-  return v && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v) ? v : null;
-}
-
-export function setChangelogSeen(version: string) {
-  writeRaw(KEYS.changelogSeen, version);
-  invalidate(KEYS.changelogSeen);
-}
-
 // recent searches (newest first, at most RECENT_SEARCH_LIMIT; this browser only)
 function getRecentSearches(): string[] {
   return cached(KEYS.recentSearches, () => {
@@ -483,10 +470,6 @@ export function useThemePreference(): ThemePreference {
 
 export function useFontPreference(): FontPreference {
   return useSyncExternalStore(subscribeFont, getFontPreference, () => null);
-}
-
-export function useChangelogSeen(): string | null {
-  return useSyncExternalStore(subscribeChangelog, getChangelogSeen, () => null);
 }
 
 const NO_SEARCHES: string[] = [];

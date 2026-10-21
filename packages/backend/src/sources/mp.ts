@@ -124,8 +124,8 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
 
 /** Every enabled account is checked once per its interval (the paid list call is the cost). */
 export async function scheduleMpReconcile(now = new Date()) {
-  // Without Dajiala there is nothing to check the accounts with.
-  if (!dajialaConfigured()) return { enqueued: 0 };
+  // Without a key there is nothing to check the accounts with; saving one starts this at the next run.
+  if (!(await dajialaConfigured())) return { enqueued: 0 };
   const rows = await sql<{ id: string; last: string | null; interval_minutes: number }[]>`
     SELECT id, cursor->>'lastCheckedAt' AS last, interval_minutes FROM sources WHERE kind = 'mp_account' AND enabled`;
   let enqueued = 0;

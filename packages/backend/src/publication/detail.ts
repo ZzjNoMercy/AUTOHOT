@@ -133,8 +133,9 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
   let group: SiteItemDetail["group"] = null;
   if (row.fact_id) {
     const [g] = await sql<{ public_id: string; reports: number; sources: number }[]>`
-      SELECT f.public_id, count(p.article_id) AS reports, count(DISTINCT p.source_id) AS sources
+      SELECT f.public_id, count(p.article_id) AS reports, count(DISTINCT coalesce(s.source_group_id, CASE WHEN s.kind = 'weibo' THEN 'weibo' ELSE s.id END)) AS sources
       FROM facts f JOIN fact_articles fa ON fa.fact_id = f.id JOIN publications p ON p.article_id = fa.article_id
+      JOIN sources s ON s.id = p.source_id
       WHERE f.id = ${row.fact_id} AND ${evidenceCondition()} AND ${listedCondition(now)}
       GROUP BY f.public_id`;
     if (g) {

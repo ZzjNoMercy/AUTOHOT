@@ -149,7 +149,7 @@ Nearly everything to change is in the [`site/`](site/) and [`industry/`](industr
 | `industry/prompts/` | The selection standard and the writing requirements. **Your field's know-how goes here** |
 | `industry/selection.ts` | Selection thresholds |
 | `site/models.ts` | Which model each step uses by default (optional: otherwise every step uses the one in `.env`) |
-| `site/brand/`, `site/pages/`, `site/public/`, `site/changelog.json` | Icons and logo, terms of use and privacy notice, files served from the site root such as `robots.txt`, the changelog |
+| `site/brand/`, `site/pages/`, `site/public/` | Icons and logo, terms of use and privacy notice, files served from the site root such as `robots.txt` |
 | `modules/` | Features the framework doesn't have and only your site needs, as modules; see “模块” in [Architecture](docs/architecture.md#模块) |
 
 What is most worth your time is the scoring rubric (`industry/prompts/selection-score.md`) and the thresholds: take one or two hundred items you labelled yourself, run them through `scripts/eval-selection.ts`, see how accurately it selects, and go back and adjust. How to do it is in [Selection and calibration](docs/selection.md).
@@ -167,6 +167,7 @@ The documents below are in Chinese.
 | [Overview evaluation](docs/story-digest-evaluation.md) | Before changing the event overview prompt, how to compare versions side by side on the same events |
 | [Deployment](docs/deploy.md) | Docker, domains and HTTPS, mainland China, updates, backups, what it costs, and running on Linux or macOS (WSL2 on Windows) without Docker |
 | [Architecture](docs/architecture.md) | Three processes, the rules that don't change, directories, modules, database migrations, public outputs, tests |
+| [Architecture overview](docs/architecture-overview.md) | The one-page summary: topology, stack, directories, data flow, sources and schedules, the rules to keep (Chinese) |
 
 Stack: Node.js 24 · TypeScript · React Router (server-side rendering) · Fastify · PostgreSQL · pg-boss · Tailwind CSS · Docker Compose.
 

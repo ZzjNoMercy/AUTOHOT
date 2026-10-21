@@ -115,7 +115,7 @@ async function findMissingIcons(): Promise<{ checked: number; found: number }> {
     SELECT s.id, s.kind, s.config, a.urls
     FROM sources s
     LEFT JOIN LATERAL (SELECT array_agg(url) AS urls FROM (SELECT url FROM articles WHERE source_id = s.id ORDER BY discovered_at DESC LIMIT 10) r) a ON true
-    WHERE s.icon_url IS NULL AND s.kind <> 'x_search'
+    WHERE s.icon_url IS NULL AND s.kind NOT IN ('x_search', 'weibo')
       AND (s.icon_checked_at IS NULL OR s.icon_checked_at < now() - make_interval(days => CASE WHEN s.kind = 'mp_account' THEN ${MP_RETRY_DAYS}::int ELSE ${RETRY_DAYS}::int END))
     ORDER BY s.icon_checked_at NULLS FIRST, s.id
     LIMIT ${BATCH}`;

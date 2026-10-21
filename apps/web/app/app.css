@@ -1,8 +1,7 @@
 @import "tailwindcss";
-/* Classes also live in the site's logo and changelog drawings (site/brand, site/changelog) and in the
+/* Classes also live in the site's logo drawings (site/brand) and in the
    modules' web code (their other files are not scanned: words in backend code and data would become classes). */
 @source "../../../site/brand";
-@source "../../../site/changelog";
 @source "../../../modules/*/{web.tsx,web/**}";
 
 /* ---------------------------------------------------------------------------

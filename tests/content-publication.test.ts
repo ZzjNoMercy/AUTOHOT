@@ -38,10 +38,10 @@ process.env.DEEPSEEK_BASE_URL = `${provider.url}/v1`;
 process.env.DEEPSEEK_API_KEY = "test-key";
 after(async () => { await provider.close(); await stopBoss(); await closeDb(); });
 
-async function source(suffix: string, tier: string, owner: string | null = null, role: string | null = null) {
+async function source(suffix: string, tier: string, owner: string | null = null, role: string | null = null, kind = "rss", group: string | null = null) {
   const id = `${key}-${suffix}`;
-  await sql`INSERT INTO sources (id,name,kind,tier,participation_mode,owner_entity_id,config,first_party,next_fetch_at)
-    VALUES (${id},${suffix},'rss',${tier},'editorial',${owner},${sql.json(role ? { publisherRole: role } : {})},${tier !== 'T1'},'2100-01-01')`;
+  await sql`INSERT INTO sources (id,name,kind,tier,participation_mode,owner_entity_id,source_group_id,config,first_party,next_fetch_at)
+    VALUES (${id},${suffix},${kind},${tier},'editorial',${owner},${group},${sql.json(role ? { publisherRole: role } : {})},${tier !== 'T1'},'2100-01-01')`;
   return id;
 }
 async function story(title = "OpenAI 发布 Dots") {
@@ -77,9 +77,9 @@ test("source tier and event ownership are separate; mentions of an entity do not
     assert.equal(representativePriority({ ...org, fact_subject: subject }), 3, String(subject));
   }
   assert.equal(representativePriority({ ...org, fact_subject: "ChatGPT" }), 1, "exact configured product alias");
-  assert.equal(representativePriority({ ...org, fact_subject: "OpenAI / Anthropic" }), 1, "explicit co-subject list");
+  assert.equal(representativePriority({ ...org, fact_subject: "OpenAI / 比亚迪" }), 1, "explicit co-subject list");
   assert.equal(representativePriority({ ...org, owner_entity_id: "qwen", fact_subject: "Qwen Team" }), 1, "the company under another of its own names");
-  assert.equal(representativePriority({ ...org, owner_entity_id: "world-labs", fact_subject: "AMD + World Labs" }), 1);
+  assert.equal(representativePriority({ ...org, owner_entity_id: "catl", fact_subject: "宁德时代 + 比亚迪" }), 1);
   assert.equal(representativePriority({ ...org, fact_subject: "OpenAI + " }), 3, "incomplete subject list is not evidence");
   assert.equal(representativePriority({ ...org, owner_entity_id: null }), 3);
   assert.equal(representativePriority({ ...org, owner_entity_id: "unregistered-org", fact_subject: "unregistered-org" }), 3, "equal unknown strings are not verified identity");
@@ -358,6 +358,27 @@ test("the hot board shows an event under its own title, linked to the fact most 
   assert.equal((await latestHotRanking())!.entries.find(e => e.storyId === g.storyId)!.title, "OpenAI 发布常驻智能体 Dots", "a retitled event shows at once");
   await sql`UPDATE fact_articles SET role='mention' WHERE article_id=${blog}`;
   assert.ok(!(await latestHotRanking())!.entries.some(e => e.storyId === g.storyId), "regrouped or mention-only representatives leave cached rankings immediately");
+});
+
+// Weibo accounts are one public source with one participant per account: the source count follows
+// the source group, the participant count and faces stay per account.
+test("accounts of one source group count as one source but remain separate participants", async () => {
+  const first = await source("weibo-first", "T2", null, null, "weibo");
+  const second = await source("weibo-second", "T2", null, null, "weibo");
+  const g = await story("微博账号共用一个来源");
+  const ids = [
+    await report(first, g, { title: "换电进展一", hours: 2, selected: false, score: 50 }),
+    await report(second, g, { title: "换电进展二", hours: 1, selected: false, score: 50 }),
+  ];
+  for (const [i, id] of ids.entries()) await sql`INSERT INTO story_signals (story_id,article_id,source_id,participant_key,kind,observed_at)
+    VALUES (${g.storyId},${id},(SELECT source_id FROM articles WHERE id=${id}),${`${key}-weibo-${i}`},'editorial',${at(1)})`;
+  const { id: rankingId } = await computeHotRanking(now);
+  const [saved] = await sql<{ entries: Array<{ storyId: number; sourceCount: number; participantCount: number; sourceNames: string[] }> }[]>`
+    SELECT entries FROM hot_rankings WHERE id = ${rankingId}`;
+  const entry = saved!.entries.find(e => e.storyId === g.storyId)!;
+  assert.equal(entry.sourceCount, 1, "the group is one source");
+  assert.equal(entry.participantCount, 2, "each account is still a participant");
+  assert.deepEqual(entry.sourceNames, ["微博"]);
 });
 
 // A saved ranking's event clock can still point at a withdrawn report. Public hot metadata must use

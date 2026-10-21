@@ -1,6 +1,7 @@
 // WeChat accounts through Dajiala: a body that failed for a passing reason is fetched again on the
 // next check and the article goes back to analysis; a body already stored is not bought again; the key
-// the requests carry in their query never follows a redirect to another origin.
+// the requests carry in their query never follows a redirect to another origin; a key saved in the
+// backend beats the environment variable and only its masked tail ever leaves the backend.
 import { Reply, stub, tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import http from "node:http";
@@ -8,7 +9,8 @@ import { after, before, test } from "node:test";
 import { config } from "@aihot/backend/config";
 import { closeDb, sql } from "@aihot/backend/db";
 import { stopBoss } from "@aihot/backend/jobs/queue";
-import { mpArticle } from "@aihot/backend/providers/dajiala";
+import { dajialaConfigured, mpArticle } from "@aihot/backend/providers/dajiala";
+import { clearProviderKey, providerKey, providerKeyStates, saveProviderKey } from "@aihot/backend/providers/keys";
 import { checkMpAccount } from "@aihot/backend/sources/mp";
 
 const T = tag();
@@ -70,6 +72,24 @@ async function origin(answer: (url: URL, res: http.ServerResponse) => void) {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   return { hits, url: `http://127.0.0.1:${(server.address() as { port: number }).port}`, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
 }
+
+test("a key saved on the settings page is used instead of the environment, and only its tail comes back", async () => {
+  const saved = process.env.DAJIALA_KEY;
+  try {
+    await saveProviderKey("DAJIALA_KEY", "admin-key-abcdef", "test");
+    assert.equal(await providerKey("DAJIALA_KEY"), "admin-key-abcdef", "the saved key wins over the environment variable");
+    assert.equal(await dajialaConfigured(), true, "the provider counts as configured");
+    assert.deepEqual((await providerKeyStates()), [{ name: "DAJIALA_KEY", from: "admin", masked: "••••••••abcdef" }], "only the masked tail is exposed");
+    const logged = await sql`SELECT before, after FROM audit_log WHERE action IN ('settings.provider_key', 'settings.provider_key_clear')`;
+    assert.ok(!JSON.stringify(logged).includes("admin-key-abcdef"), "the audit log keeps masks, not the key");
+    await clearProviderKey("DAJIALA_KEY", "test");
+    assert.equal(await providerKey("DAJIALA_KEY"), "test-key", "clearing falls back to the environment variable");
+  } finally {
+    if (saved === undefined) delete process.env.DAJIALA_KEY;
+    else process.env.DAJIALA_KEY = saved;
+    await clearProviderKey("DAJIALA_KEY", "test");
+  }
+});
 
 test("the Dajiala key never follows a redirect to another origin; a same-origin redirect still works", async () => {
   const json = (res: http.ServerResponse) => { res.writeHead(200, { "content-type": "application/json" }); res.end('{"code":0,"title":"fixture","content":"fixture"}'); };

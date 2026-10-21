@@ -5,9 +5,10 @@ import { beijingDate, beijingMidnight } from "@aihot/contracts/time";
 import { sql } from "../db.ts";
 import { cachedByKey } from "../lib/cache.ts";
 import { pickRepresentative, REPRESENTATIVE_COLUMNS, type RepresentativeRow } from "./representative.ts";
+import { sourceGroupKey } from "./source-identity.ts";
 import { decodeCursor, encodeCursor, InvalidCursorError, queryBinding } from "../lib/cursor.ts";
 import {
-  ITEM_COLUMNS, ITEM_FROM, categoryCondition, channelCondition, tagCondition, toFeedItemSummary,
+  ITEM_COLUMNS, ITEM_FROM, categoryCondition, channelCondition, entityCondition, tagCondition, toFeedItemSummary,
   type ItemRow,
 } from "./items.ts";
 import { evidenceCondition, foldableSelectionCondition, listedCondition, ownFactEvidenceCondition, selectedCondition } from "./scope.ts";
@@ -24,11 +25,11 @@ interface GroupRow {
 }
 
 function filterSql(q: TimelineQuery) {
-  return sql`${channelCondition(q.channel)} ${categoryCondition(q.category)} ${tagCondition(q.tag)}`;
+  return sql`${channelCondition(q.channel)} ${categoryCondition(q.category)} ${entityCondition(q.entity?.id)} ${tagCondition(q.tag)}`;
 }
 
 function binding(q: TimelineQuery): string {
-  return queryBinding({ c: q.channel, k: q.category, t: q.tag });
+  return queryBinding({ c: q.channel, k: q.category, e: q.entity?.id ?? null, t: q.tag });
 }
 
 /**
@@ -37,9 +38,10 @@ function binding(q: TimelineQuery): string {
  */
 async function groupPool(q: TimelineQuery, now: Date, factIds: number[]) {
   if (!factIds.length) return [];
-  return sql<{ fact_id: number; article_id: string; source_id: string }[]>`
-    SELECT DISTINCT f.id AS fact_id, p.article_id, p.source_id
+  return sql<{ fact_id: number; article_id: string; source_id: string; source_kind: string; source_group_id: string | null }[]>`
+    SELECT DISTINCT f.id AS fact_id, p.article_id, s.id AS source_id, s.kind AS source_kind, s.source_group_id
     FROM facts f JOIN fact_articles fa ON fa.fact_id = f.id JOIN publications p ON p.article_id = fa.article_id
+    JOIN sources s ON s.id = p.source_id
     WHERE f.id IN ${sql(factIds)}
       AND ${evidenceCondition()} AND ${listedCondition(now)} ${filterSql(q)}`;
 }
@@ -133,10 +135,13 @@ export async function loadTimeline(q: TimelineQuery): Promise<Omit<TimelineRespo
     if (!candidates.length) continue;
     const rep = pickRepresentative(candidates);
     const reports = pool.filter((r) => r.fact_id === factId);
-    const repSource = reports.find((r) => r.article_id === rep.id)?.source_id;
+    const repSource = reports.find((r) => r.article_id === rep.id);
+    const repSourceKey = repSource ? sourceGroupKey({ id: repSource.source_id, name: "", kind: repSource.source_kind, source_group_id: repSource.source_group_id }) : null;
     const group: GroupInfo = {
       factId: factInfo.get(factId)?.public_id ?? String(factId),
-      additionalSourceCount: new Set(reports.filter((r) => r.source_id !== repSource).map((r) => r.source_id)).size,
+      additionalSourceCount: new Set(reports
+        .filter((r) => sourceGroupKey({ id: r.source_id, name: "", kind: r.source_kind, source_group_id: r.source_group_id }) !== repSourceKey)
+        .map((r) => sourceGroupKey({ id: r.source_id, name: "", kind: r.source_kind, source_group_id: r.source_group_id }))).size,
       reportCount: new Set(reports.map((r) => r.article_id)).size,
       memberIds: [...new Set(candidates.map((m) => m.id))],
     };
@@ -160,5 +165,5 @@ export async function loadTimeline(q: TimelineQuery): Promise<Omit<TimelineRespo
 
   const last = page[page.length - 1];
   const nextCursor = hasMore && last ? encodeCursor("tl2", { a: last.anchor_at.getTime(), g: last.gk, b: bind }) : null;
-  return { filters: { channel: q.channel, category: q.category, tag: q.tag }, cards, nextCursor, dayCounts };
+  return { filters: { channel: q.channel, category: q.category, entity: q.entity, tag: q.tag }, cards, nextCursor, dayCounts };
 }
