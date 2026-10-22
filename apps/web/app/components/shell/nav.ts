@@ -21,7 +21,7 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
     items: [
       { to: "/", label: "精选", icon: IconBolt, end: true },
       { to: "/all", label: "全部动态", icon: IconList },
-      { to: "/hot", label: "热点榜", icon: IconFlame },
+      { to: "/hot", label: "热点/专题", icon: IconFlame },
       { to: "/daily", label: "日报", icon: IconDoc },
       { to: "/topics", label: "主题", icon: IconGrid },
       { to: "/starred", label: "收藏", icon: IconBookmark },
@@ -61,6 +61,7 @@ export function sidebar(): Array<{ title: string; items: NavItem[] }> {
 export function sidebarIsActive(item: NavItem, pathname: string): boolean {
   if (item.end) return pathname === item.to;
   if (item.to === "/daily") return /^\/(daily|weekly|monthly)(\/|$)/.test(pathname);
+  if (item.to === "/hot") return pathname === "/hot" || pathname.startsWith("/specials");
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
