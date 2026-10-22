@@ -39,6 +39,26 @@ function sourceKey(row: { source_id: string; owner_entity_id: string | null; sig
   return `source:${row.source_id}`;
 }
 
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, "\\$&");
+
+/** A title seeds the name; reports that mention it only in the body still belong to the same conference. */
+async function expandByBody(group: { name: string; reports: Set<string>; sources: Set<string>; samples: string[]; first: Date; last: Date }, now: Date, days: number) {
+  const like = `%${escapeLike(group.name)}%`;
+  const rows = await sql<{ article_id: string; title: string; source_id: string; owner_entity_id: string | null; signal_group_id: string | null; timeline_at: Date }[]>`
+    SELECT p.article_id, p.title, p.source_id, s.owner_entity_id, s.signal_group_id, p.timeline_at
+    FROM publications p JOIN articles a ON a.id = p.article_id JOIN sources s ON s.id = p.source_id
+    WHERE ${listedCondition(now)}
+      AND p.timeline_at > ${now}::timestamptz - make_interval(days => ${days})
+      AND (p.title ILIKE ${like} OR coalesce(p.summary, '') ILIKE ${like} OR left(coalesce(a.body_text, ''), 4000) ILIKE ${like})`;
+  for (const row of rows) {
+    group.reports.add(row.article_id);
+    group.sources.add(sourceKey(row));
+    if (group.samples.length < 5 && !group.samples.includes(row.title)) group.samples.push(row.title);
+    if (row.timeline_at < group.first) group.first = row.timeline_at;
+    if (row.timeline_at > group.last) group.last = row.timeline_at;
+  }
+}
+
 /** Recent conference-like titles grouped by name; only names several independent sources mention. */
 export async function scanCandidates(days = 14): Promise<SpecialCandidate[]> {
   const now = new Date();
@@ -64,6 +84,9 @@ export async function scanCandidates(days = 14): Promise<SpecialCandidate[]> {
       groups.set(key, group);
     }
   }
+
+  // Titles only produce the names; the body decides whether more independent sources mentioned it.
+  for (const group of groups.values()) await expandByBody(group, now, days);
 
   const existing = await sql<{ title: string; alias: string | null }[]>`
     SELECT s.title, a.alias FROM specials s LEFT JOIN special_aliases a ON a.special_id = s.id`;

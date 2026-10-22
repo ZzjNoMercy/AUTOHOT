@@ -111,3 +111,17 @@ test("a published special writes its overview from the member events", async () 
     await provider.close();
   }
 });
+
+test("a report that names the conference only in its body still adds an independent source", async () => {
+  const a = await source("body-a");
+  const b = await source("body-b");
+  const c = await source("body-c");
+  await report(a, "世界智能网联汽车大会开幕");
+  await report(b, "世界智能网联汽车大会：L4 路线之争");
+  const third = await report(c, "某车企发布 L4 方案");
+  await sql`UPDATE articles SET body_text = '在2026世界智能网联汽车大会上，该车企发布了 L4 方案。' WHERE id = ${third}`;
+  const candidate = (await scanCandidates(14)).find((x) => x.name === "世界智能网联汽车大会");
+  assert.ok(candidate, "the body mention is part of the same candidate");
+  assert.equal(candidate.sourceCount, 3);
+  assert.ok(candidate.samples.includes("某车企发布 L4 方案"));
+});

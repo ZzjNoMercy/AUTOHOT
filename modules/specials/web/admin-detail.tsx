@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLoaderData } from "react-router";
+import { useLoaderData } from "react-router";
 import type { AdminSpecialResponse } from "../types.ts";
 import { adminGet } from "@aihot/web/lib/admin.server";
 import { useAdminAction } from "@aihot/web/features/admin/action";
@@ -52,11 +52,11 @@ export default function AdminSpecialDetailPage() {
 
   return (
     <AdminPage
+      back={{ to: "/admin/specials", label: "专题列表" }}
       title={special.title}
       subtitle={<><span className="font-mono">{special.slug}</span> · {special.storyCount} 个事件 · {special.reportCount} 篇报道</>}
       actions={
         <div className="flex flex-wrap gap-2">
-          <Link to="/admin/specials" className="text-[13px] text-ink-3 hover:text-accent">← 专题列表</Link>
           <Button size="sm" busy={pending === "special-sync"} onClick={() => void run("POST", `/api/admin/specials/${special.id}/sync`, {}, { label: "special-sync", success: "已重新匹配" })}>重新匹配</Button>
           <Button size="sm" busy={pending === "special-digest"} onClick={() => void run("POST", `/api/admin/specials/${special.id}/digest`, {}, { label: "special-digest", success: "综述已排队" })}>重写综述</Button>
           {special.status !== "published"

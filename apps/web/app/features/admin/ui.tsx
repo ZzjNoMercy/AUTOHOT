@@ -5,11 +5,24 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
 import { ago, bj } from "./format";
 
-export function AdminPage({ title, subtitle, actions, children }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode }) {
+export function AdminPage({ title, subtitle, actions, back, children }: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+  /** 返回到上一级列表；放在标题上方，不占右侧操作区。 */
+  back?: { to: string; label: string };
+  children: ReactNode;
+}) {
   return (
     <div className="mx-auto w-full max-w-[1320px] px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pt-8">
       <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
+          {back && (
+            <Link to={back.to} className="mb-2 inline-flex items-center gap-1 text-[12.5px] text-ink-4 transition-colors hover:text-accent">
+              <span aria-hidden="true">←</span>
+              {back.label}
+            </Link>
+          )}
           <h1 className="text-[22px] font-semibold tracking-tight text-ink sm:text-[24px]">{title}</h1>
           {subtitle && <p className="mt-1 text-[13.5px] leading-relaxed text-ink-3">{subtitle}</p>}
         </div>
