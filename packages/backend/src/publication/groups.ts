@@ -3,7 +3,7 @@
 import type { CategoryKey, ChannelKey } from "@aihot/contracts/taxonomy";
 import type { GroupReportsResponse } from "@aihot/contracts/site";
 import { sql } from "../db.ts";
-import { categoryCondition, channelCondition, tagCondition } from "./items.ts";
+import { categoryCondition, channelCondition, sourceCondition, tagCondition } from "./items.ts";
 import { evidenceCondition, listedCondition } from "./scope.ts";
 import { publicSourceName } from "./rules.ts";
 
@@ -12,6 +12,7 @@ export interface GroupReportsQuery {
   channel: ChannelKey;
   category: CategoryKey | null;
   tag: string | null;
+  source?: string | null;
 }
 
 /** A fact has a few dozen reports at most; the cap only bounds an odd one. */
@@ -24,7 +25,7 @@ export async function loadGroupReports(q: GroupReportsQuery, now = new Date()): 
     FROM facts f JOIN fact_articles fa ON fa.fact_id = f.id JOIN publications p ON p.article_id = fa.article_id
     JOIN sources s ON s.id = p.source_id
     WHERE f.public_id = ${q.factPublicId} AND ${evidenceCondition()} AND ${listedCondition(now)}
-      ${channelCondition(q.channel)} ${categoryCondition(q.category)} ${tagCondition(q.tag)}
+      ${channelCondition(q.channel)} ${categoryCondition(q.category)} ${tagCondition(q.tag)} ${sourceCondition(q.source)}
     ORDER BY p.timeline_at DESC, p.article_id ASC
     LIMIT ${MAX_REPORTS}`;
   if (members.length === 0) return null;

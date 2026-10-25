@@ -14,18 +14,19 @@ const query = (q: string) => ({ channel: "all" as const, category: null, tag: nu
 after(closeDb);
 before(async () => {
   await sql`INSERT INTO sources (id, name, kind, tier) VALUES (${T}, ${T}, 'rss', 'T1')`;
+  await sql`INSERT INTO sources (id, name, kind, tier) VALUES (${`${T}-weibo`}, ${`${T}-weibo`}, 'weibo', 'T2')`;
 });
 
 async function add(suffix: string, direct: string, body: string, options: {
   title?: string; age?: number; channel?: "news" | "x"; category?: "new-car" | "tech"; tags?: string[];
-  visibility?: string; eligible?: boolean; future?: boolean; noSearchRow?: boolean;
+  visibility?: string; eligible?: boolean; future?: boolean; noSearchRow?: boolean; sourceId?: string;
 } = {}) {
   const at = new Date(+now - (options.age ?? 60) * 1000);
   await sql`INSERT INTO articles (id, source_id, identity_key, url, title, discovered_at, timeline_at)
-    VALUES (${id(suffix)}, ${T}, ${id(suffix)}, ${`https://example.org/${id(suffix)}`}, ${options.title ?? "neutral"}, ${at}, ${at})`;
+    VALUES (${id(suffix)}, ${options.sourceId ?? T}, ${id(suffix)}, ${`https://example.org/${id(suffix)}`}, ${options.title ?? "neutral"}, ${at}, ${at})`;
   await sql`INSERT INTO publications (article_id, title, source_id, channel, category, tags, url, discovered_at, timeline_at, sort_at,
     selected, eligible, visibility, visible_after, search_text)
-    VALUES (${id(suffix)}, ${options.title ?? "neutral"}, ${T}, ${options.channel ?? "news"}, ${options.category ?? "new-car"}, ${options.tags ?? []},
+    VALUES (${id(suffix)}, ${options.title ?? "neutral"}, ${options.sourceId ?? T}, ${options.channel ?? "news"}, ${options.category ?? "new-car"}, ${options.tags ?? []},
       ${`https://example.org/${id(suffix)}`}, ${at}, ${at}, ${at}, ${options.future ?? false}, ${options.eligible ?? true},
       ${options.visibility ?? "public"}, ${options.future ? new Date(+now + 60_000) : at}, ${direct})`;
   if (!options.noSearchRow) await sql`INSERT INTO pool_search (article_id, direct, body) VALUES (${id(suffix)}, ${direct}, ${body})`;
@@ -72,4 +73,17 @@ test("relevance retains combined filters and literal LIKE characters", async () 
   await add("literal", "qx%_\\z", "");
   await add("wildcard-lookalike", "qx-anything-z", "");
   assert.deepEqual((await loadPool(query("qx%_\\z"))).items.map(item => item.id), [id("literal")]);
+});
+
+test("the source filter matches one source and a whole platform", async () => {
+  await add("source-rss", "src", "", { age: 2 });
+  await add("source-weibo", "src", "", { age: 1, sourceId: `${T}-weibo` });
+  const all = await loadPool({ ...query(""), source: null });
+  assert.deepEqual(all.items.filter((i) => i.id.startsWith(id("source-"))).map((i) => i.id).sort(), [id("source-rss"), id("source-weibo")].sort());
+  const weibo = await loadPool({ ...query(""), source: "kind:weibo" });
+  assert.deepEqual(weibo.items.map((i) => i.id), [id("source-weibo")]);
+  const one = await loadPool({ ...query(""), source: `${T}-weibo` });
+  assert.deepEqual(one.items.map((i) => i.id), [id("source-weibo")]);
+  const none = await loadPool({ ...query(""), source: "missing-source" });
+  assert.deepEqual([none.items, none.total], [[], 0]);
 });

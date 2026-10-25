@@ -115,6 +115,11 @@ export interface TimelineFilters {
   /** The company filter (a subject id from the industry's entity dictionary); absent means none. */
   entity?: EntityFilter | null;
   tag: string | null;
+  /**
+   * The source filter: a source id, or `kind:weibo` / `kind:mp_account` / `kind:external` for a
+   * whole platform. Absent means no source filter.
+   */
+  source?: string | null;
 }
 
 /** The company a feed is filtered by: the stored subject id and the name readers know it by. */
@@ -133,6 +138,26 @@ export interface CompanyOption {
 
 export interface CompaniesResponse {
   companies: CompanyOption[];
+}
+
+/** One row of the source filter's list: a source with listed content, most first. */
+export interface SourceOption {
+  id: string;
+  name: string;
+  /** rss · web_list · json_list · x_search · weibo · mp_account · external */
+  kind: string;
+  count: number;
+}
+
+/** A platform-level option, such as 微博 or 公众号, counted across its sources. */
+export interface SourcePlatformOption {
+  kind: string;
+  count: number;
+}
+
+export interface SourcesResponse {
+  sources: SourceOption[];
+  platforms: SourcePlatformOption[];
 }
 
 export interface TimelineResponse {

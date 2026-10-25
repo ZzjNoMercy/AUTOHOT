@@ -108,6 +108,16 @@ export function tagCondition(tag: string | null | undefined) {
   return sql`AND p.tags @> ${[tag]}::text[]`;
 }
 
+/**
+ * The source filter: one source, or a whole platform (`kind:weibo`, `kind:mp_account`, ...).
+ * A source id that no longer exists matches nothing; the page shows its empty state.
+ */
+export function sourceCondition(source: string | null | undefined) {
+  if (!source) return sql``;
+  if (source.startsWith("kind:")) return sql`AND p.source_id IN (SELECT id FROM sources WHERE kind = ${source.slice(5)})`;
+  return sql`AND p.source_id = ${source}`;
+}
+
 function mediaView(m: Record<string, any>, mode: "card" | "thumb" | "full" = "thumb", responsive = false): MediaView | null {
   const url = proxiedImage(m.url, mode);
   if (!url) return null;

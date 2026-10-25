@@ -8,7 +8,7 @@ import { pickRepresentative, REPRESENTATIVE_COLUMNS, type RepresentativeRow } fr
 import { sourceGroupKey } from "./source-identity.ts";
 import { decodeCursor, encodeCursor, InvalidCursorError, queryBinding } from "../lib/cursor.ts";
 import {
-  ITEM_COLUMNS, ITEM_FROM, categoryCondition, channelCondition, entityCondition, tagCondition, toFeedItemSummary,
+  ITEM_COLUMNS, ITEM_FROM, categoryCondition, channelCondition, entityCondition, sourceCondition, tagCondition, toFeedItemSummary,
   type ItemRow,
 } from "./items.ts";
 import { evidenceCondition, foldableSelectionCondition, listedCondition, ownFactEvidenceCondition, selectedCondition } from "./scope.ts";
@@ -25,11 +25,11 @@ interface GroupRow {
 }
 
 function filterSql(q: TimelineQuery) {
-  return sql`${channelCondition(q.channel)} ${categoryCondition(q.category)} ${entityCondition(q.entity?.id)} ${tagCondition(q.tag)}`;
+  return sql`${channelCondition(q.channel)} ${categoryCondition(q.category)} ${entityCondition(q.entity?.id)} ${tagCondition(q.tag)} ${sourceCondition(q.source)}`;
 }
 
 function binding(q: TimelineQuery): string {
-  return queryBinding({ c: q.channel, k: q.category, e: q.entity?.id ?? null, t: q.tag });
+  return queryBinding({ c: q.channel, k: q.category, e: q.entity?.id ?? null, t: q.tag, s: q.source ?? null });
 }
 
 /**
@@ -165,5 +165,5 @@ export async function loadTimeline(q: TimelineQuery): Promise<Omit<TimelineRespo
 
   const last = page[page.length - 1];
   const nextCursor = hasMore && last ? encodeCursor("tl2", { a: last.anchor_at.getTime(), g: last.gk, b: bind }) : null;
-  return { filters: { channel: q.channel, category: q.category, entity: q.entity, tag: q.tag }, cards, nextCursor, dayCounts };
+  return { filters: { channel: q.channel, category: q.category, entity: q.entity, tag: q.tag, source: q.source }, cards, nextCursor, dayCounts };
 }

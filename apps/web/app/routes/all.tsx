@@ -1,13 +1,13 @@
 import { useEffect } from "react";
 import { Link, redirect, useLoaderData, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/all";
-import type { CompaniesResponse, PoolResponse } from "@aihot/contracts/site";
+import type { CompaniesResponse, PoolResponse, SourcesResponse } from "@aihot/contracts/site";
 import { SITE, subjectAfter } from "@aihot/site";
 import { beijingTime } from "@aihot/contracts/time";
 import { cachedPage, loadOr404 } from "../lib/api.server";
 import { pageReuse } from "../lib/page-reuse";
 import { filterParams, hasFeedFilters, itemListLd, listPath, pageMeta, readFilters } from "../lib/seo";
-import { ActiveFilters, CategoryTabs, CompanyTabs, FeedBar, SearchField } from "../features/feed/Filters";
+import { ActiveFilters, CategoryTabs, CompanyTabs, FeedBar, SearchField, SourceTabs, platformLabel } from "../features/feed/Filters";
 import { PillTabs } from "../components/ui/Tabs";
 import { DayList, Pagination } from "../features/feed/DayList";
 import { EmptyState } from "../components/ui/Page";
@@ -29,7 +29,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const tab = url.searchParams.get("tab") === "relevance" ? "relevance" : null;
   // Older deep-paging parameters (deep, anchorAt) still open a normal page.
   const page = Math.min(Math.max(Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1, 1), 50);
-  const [data, companies] = await Promise.all([
+  const [data, companies, sources] = await Promise.all([
     loadOr404<PoolResponse>(
       listPath("/api/site/pool", { ...filterParams(readFilters(url.searchParams)), q, tab, page: page > 1 ? page : null }),
       // The busy page keeps the search, so it can be tried again as it was.
@@ -37,10 +37,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     ),
     // The row of companies is an aid, the feed is the page: without its list the row simply is not shown.
     loadOr404<CompaniesResponse>("/api/site/companies", { signal: request.signal }).catch((): CompaniesResponse => ({ companies: [] })),
+    loadOr404<SourcesResponse>("/api/site/sources", { signal: request.signal }).catch((): SourcesResponse => ({ sources: [], platforms: [] })),
   ]);
   // Past the last page of what there is: the last page, with the same search and filters.
   if (data.total > 0 && data.page > data.pageCount) throw redirect(pageHref(url.searchParams, data.pageCount));
-  return cachedPage(60, { data, companies });
+  return cachedPage(60, { data, companies, sources });
 }
 
 export function meta({ loaderData }: Route.MetaArgs) {
@@ -71,13 +72,14 @@ function pageHref(params: URLSearchParams, page: number) {
 }
 
 export default function AllPage() {
-  const { data, companies } = useLoaderData<typeof loader>();
+  const { data, companies, sources } = useLoaderData<typeof loader>();
   const [params] = useSearchParams();
   const navigation = useNavigation();
   const f = data.filters;
   const busy = navigation.state === "loading" && navigation.location?.pathname === "/all";
-  const { channel, category } = filterParams(f);
-  const keep = { channel, category };
+  const { channel, category, source } = filterParams(f);
+  const keep = { channel, category, source };
+  const sourceLabel = source ? (source.startsWith("kind:") ? platformLabel(source.slice(5)) : sources.sources.find((s) => s.id === source)?.name ?? source) : null;
   const searchTabHref = (tab: "time" | "relevance") => {
     const sp = new URLSearchParams(params);
     sp.delete("page");
@@ -118,9 +120,9 @@ export default function AllPage() {
           }
         />
       ) : (
-        <FeedBar base="/all" category={f.category} channel={f.channel} entity={f.entity} companies={companies.companies} />
+        <FeedBar base="/all" category={f.category} channel={f.channel} entity={f.entity} companies={companies.companies} source={f.source ?? null} sources={sources.sources} platforms={sources.platforms} />
       )}
-      <ActiveFilters base="/all" category={f.category} channel={f.channel} entity={f.entity} tag={f.tag} />
+      <ActiveFilters base="/all" category={f.category} channel={f.channel} entity={f.entity} tag={f.tag} source={f.source ?? null} sourceLabel={sourceLabel} />
 
       {/* Desktop, as on 精选: the title, then one filter row with the search field aligned on the right. */}
       <div className="hidden lg:block">
@@ -130,6 +132,7 @@ export default function AllPage() {
           <SearchField defaultValue={f.q ?? ""} keep={keep} />
         </div>
         <CompanyTabs base="/all" entity={f.entity ?? null} companies={companies.companies} />
+        <SourceTabs base="/all" source={f.source ?? null} sources={sources.sources} platforms={sources.platforms} />
       </div>
 
       {f.q && (

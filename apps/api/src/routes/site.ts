@@ -8,6 +8,7 @@ import { InvalidCursorError } from "@aihot/backend/lib/cursor";
 import { exportMarkdown, loadItemDetail } from "@aihot/backend/publication/detail";
 import { loadCompanyOptions, resolveCompany } from "@aihot/backend/publication/companies";
 import { loadPool, SearchBusyError } from "@aihot/backend/publication/pool";
+import { loadSourceOptions } from "@aihot/backend/publication/sources";
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { loadStoryFollowups } from "@aihot/backend/publication/followups";
 import { loadGroupReports } from "@aihot/backend/publication/groups";
@@ -47,6 +48,7 @@ export interface FilterParams {
   category: CategoryKey | null;
   entity: EntityFilter | null;
   tag: string | null;
+  source: string | null;
 }
 
 export function parseFilters(q: Record<string, string>): FilterParams {
@@ -55,7 +57,9 @@ export function parseFilters(q: Record<string, string>): FilterParams {
   const category = q.category ?? null;
   if (category !== null && !isCategoryKey(category)) throw new BadRequest("invalid category");
   const tag = q.tag?.trim() ? q.tag.trim().slice(0, 60) : null;
-  return { channel, category: category as CategoryKey | null, entity: resolveCompany(q.entity), tag };
+  const source = q.source?.trim().slice(0, 80) || null;
+  if (source && !/^(kind:(rss|web_list|json_list|x_search|weibo|mp_account|external)|[a-zA-Z0-9_-]{1,80})$/.test(source)) throw new BadRequest("invalid source");
+  return { channel, category: category as CategoryKey | null, entity: resolveCompany(q.entity), tag, source };
 }
 
 export function registerSite(app: FastifyInstance) {
@@ -63,7 +67,7 @@ export function registerSite(app: FastifyInstance) {
     const q = looseQuery(req);
     const filters = parseFilters(q);
     const limit = Math.min(Math.max(Number(q.limit) || 20, 1), 40);
-    const unfiltered = filters.channel === "all" && !filters.category && !filters.entity && !filters.tag && !q.cursor;
+    const unfiltered = filters.channel === "all" && !filters.category && !filters.entity && !filters.tag && !filters.source && !q.cursor;
     const [data, hot] = await Promise.all([
       loadTimeline({ ...filters, cursor: q.cursor || null, limit }),
       unfiltered ? loadHotStrip() : null,
@@ -86,6 +90,11 @@ export function registerSite(app: FastifyInstance) {
   app.get("/api/site/companies", siteHandler(async (req, reply) => {
     const board = looseQuery(req).board === "featured" ? "featured" : "pool";
     return sendJsonWithEtag(req, reply, await loadCompanyOptions(board), { etagPrefix: `companies-${board}`, cacheControl: "public, max-age=300, s-maxage=300" });
+  }));
+
+  // The source filter's list: sources and platforms with listed content now.
+  app.get("/api/site/sources", siteHandler(async (req, reply) => {
+    return sendJsonWithEtag(req, reply, await loadSourceOptions(), { etagPrefix: "sources", cacheControl: "public, max-age=300, s-maxage=300" });
   }));
 
   app.get("/api/site/items/:id", siteHandler(async (req, reply) => {

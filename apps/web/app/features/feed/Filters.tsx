@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Form, Link, useNavigation, useSearchParams } from "react-router";
 import { CATEGORY_KEYS, CATEGORY_LABELS, CHANNEL_LABELS, type CategoryKey, type ChannelKey } from "@aihot/contracts/taxonomy";
-import type { CompanyOption, EntityFilter } from "@aihot/contracts/site";
+import type { CompanyOption, EntityFilter, SourceOption, SourcePlatformOption } from "@aihot/contracts/site";
 import { SITE } from "@aihot/site";
 import { IconCheck, IconChevronDown, IconClose, IconFilter, IconSearch } from "../../components/icons";
 import { PillTabs } from "../../components/ui/Tabs";
@@ -11,6 +11,11 @@ import { Sheet } from "../../components/ui/Sheet";
 import { Wordmark } from "@aihot/site/brand/Logo.tsx";
 import { BarButton, PhoneBar } from "../../components/shell/PhoneBar";
 import { openSearch } from "../search/SearchOverlay";
+
+const PLATFORM_LABELS: Record<string, string> = {
+  weibo: "微博", mp_account: "公众号", x_search: "X", rss: "RSS", web_list: "网页", json_list: "JSON", external: "外部上报",
+};
+export const platformLabel = (kind: string) => PLATFORM_LABELS[kind] ?? kind;
 
 /** Same page with some query parameters changed (paging state dropped). */
 function hrefWith(base: string, params: URLSearchParams, patch: Record<string, string | null>) {
@@ -60,11 +65,11 @@ export function CategoryTabs({ base, category, channel = "all", layoutId, classN
  * The phone bar of 精选 and 全部: the brand, the 精选 | 全部 switch (a filter in use carries over), and
  * buttons for the filter sheet and search.
  */
-export function FeedBar({ base, category, channel, entity = null, companies = [] }: { base: "/" | "/all"; category: CategoryKey | null; channel: ChannelKey; entity?: EntityFilter | null; companies?: CompanyOption[] }) {
+export function FeedBar({ base, category, channel, entity = null, companies = [], source = null, sources = [], platforms = [] }: { base: "/" | "/all"; category: CategoryKey | null; channel: ChannelKey; entity?: EntityFilter | null; companies?: CompanyOption[]; source?: string | null; sources?: SourceOption[]; platforms?: SourcePlatformOption[] }) {
   const [params] = useSearchParams();
   const [sheet, setSheet] = useState(false);
   const scope = (to: string) => hrefWith(to, params, { q: null, tab: null, search: null });
-  const filtered = filterKey(category, channel) !== "all";
+  const filtered = filterKey(category, channel) !== "all" || !!source || !!entity;
   return (
     <>
       <PhoneBar
@@ -95,13 +100,13 @@ export function FeedBar({ base, category, channel, entity = null, companies = []
           </>
         }
       />
-      <FilterSheet open={sheet} onClose={() => setSheet(false)} base={base} active={filterKey(category, channel)} entity={entity} companies={companies} />
+      <FilterSheet open={sheet} onClose={() => setSheet(false)} base={base} active={filterKey(category, channel)} entity={entity} companies={companies} source={source} sources={sources} platforms={platforms} />
     </>
   );
 }
 
 /** Phones: the filter as a sheet of options, the one in use ticked; choosing one applies it. */
-function FilterSheet({ open, onClose, base, active, entity, companies }: { open: boolean; onClose: () => void; base: string; active: string; entity: EntityFilter | null; companies: CompanyOption[] }) {
+function FilterSheet({ open, onClose, base, active, entity, companies, source, sources, platforms }: { open: boolean; onClose: () => void; base: string; active: string; entity: EntityFilter | null; companies: CompanyOption[]; source: string | null; sources: SourceOption[]; platforms: SourcePlatformOption[] }) {
   const [params] = useSearchParams();
   const row = (on: boolean) => `-mx-2 flex h-12 items-center justify-between rounded-tile px-2 text-[16px] transition-colors active:bg-bg-sunk ${on ? "font-semibold text-accent" : "text-ink"}`;
   return (
@@ -124,6 +129,26 @@ function FilterSheet({ open, onClose, base, active, entity, companies }: { open:
           );
         })}
       </ul>
+      {(sources.length > 0 || platforms.length > 0) && (
+        <>
+          <h3 className="mx-4 mb-1 mt-5 text-[13px] font-semibold text-ink-3">来源</h3>
+          <ul className="mx-4 divide-y divide-line-soft">
+            {[
+              { key: "", label: "不限", on: !source },
+              ...platforms.filter((p) => p.kind === "weibo" || p.kind === "mp_account" || p.kind === "x_search")
+                .map((p) => ({ key: `kind:${p.kind}`, label: `${platformLabel(p.kind)} ${p.count}`, on: source === `kind:${p.kind}` })),
+              ...sources.map((s) => ({ key: s.id, label: `${s.name} ${s.count}`, on: source === s.id })),
+            ].map((item, i) => (
+              <li key={item.key || `source-none-${i}`}>
+                <Link to={hrefWith(base, params, { source: item.key || null })} onClick={onClose} aria-current={item.on ? "true" : undefined} className={row(item.on)}>
+                  <span className="truncate">{item.label}</span>
+                  {item.on && <IconCheck size={19} strokeWidth={2.2} />}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       {companies.length > 0 && (
         <>
           <h3 className="mx-4 mb-1 mt-5 text-[13px] font-semibold text-ink-3">公司</h3>
@@ -150,13 +175,14 @@ function FilterSheet({ open, onClose, base, active, entity, companies }: { open:
 }
 
 /** The filters in use, as chips under the bar; each one clears itself when tapped. */
-export function ActiveFilters({ base, category, channel, entity = null, tag }: { base: string; category: CategoryKey | null; channel: ChannelKey; entity?: EntityFilter | null; tag: string | null }) {
+export function ActiveFilters({ base, category, channel, entity = null, tag, source = null, sourceLabel = null }: { base: string; category: CategoryKey | null; channel: ChannelKey; entity?: EntityFilter | null; tag: string | null; source?: string | null; sourceLabel?: string | null }) {
   const [params] = useSearchParams();
   const label = channel === "firstParty" ? CHANNEL_LABELS.firstParty : category ? CATEGORY_LABELS[category] : null;
   const q = params.get("q")?.trim() ?? "";
   const chips: Array<{ key: string; text: string; clear: Record<string, string | null> }> = [];
   if (label) chips.push({ key: "scope", text: `只看${label}`, clear: { category: null, channel: null } });
   if (entity) chips.push({ key: "entity", text: `公司：${entity.name}`, clear: { entity: null } });
+  if (source) chips.push({ key: "source", text: `来源：${sourceLabel ?? source}`, clear: { source: null } });
   if (tag) chips.push({ key: "tag", text: `#${tag}`, clear: { tag: null } });
   if (q) chips.push({ key: "q", text: `搜索：${q}`, clear: { q: null } });
   if (!chips.length) return null;
@@ -170,7 +196,7 @@ export function ActiveFilters({ base, category, channel, entity = null, tag }: {
         </Link>
       ))}
       {chips.length > 1 && (
-        <Link to={hrefWith(base, params, { category: null, channel: null, entity: null, tag: null, q: null })} className="text-[13px] text-ink-3 underline-offset-2 transition-colors hover:text-accent hover:underline">
+        <Link to={hrefWith(base, params, { category: null, channel: null, entity: null, tag: null, source: null, q: null })} className="text-[13px] text-ink-3 underline-offset-2 transition-colors hover:text-accent hover:underline">
           全部清空
         </Link>
       )}
@@ -185,6 +211,53 @@ const COMPANY_ROW = 9;
  * The company row: its own dimension beside the categories, so a reader can narrow to one company
  * without giving up the category. Only companies with content are offered, most content first.
  */
+export function SourceTabs({ base, source, sources, platforms }: { base: string; source: string | null; sources: SourceOption[]; platforms: SourcePlatformOption[] }) {
+  const [params] = useSearchParams();
+  const [open, setOpen] = useState(false);
+  if (!sources.length && !platforms.length) return null;
+  const platformItems = platforms
+    .filter((p) => p.kind === "weibo" || p.kind === "mp_account" || p.kind === "x_search")
+    .map((p) => ({ key: `kind:${p.kind}`, label: `${platformLabel(p.kind)} ${p.count}`, value: `kind:${p.kind}` }));
+  const sourceItems = sources.map((s) => ({ key: s.id, label: `${s.name} ${s.count}`, value: s.id }));
+  const items = [...platformItems, ...sourceItems];
+  const more = items.length > 8;
+  const shown = open || !more ? items : items.slice(0, 8);
+  return (
+    <div className="mb-4 hidden items-center gap-3 lg:flex">
+      <span className="shrink-0 text-[13px] font-medium text-ink-3">来源</span>
+      <PillTabs
+        size="sm"
+        layoutId="source-row"
+        label="按来源筛选"
+        active={source ?? ""}
+        wrap={open}
+        className="min-w-0"
+        items={[
+          { key: "", label: "不限", to: hrefWith(base, params, { source: null }), prefetch: "intent" as const },
+          ...shown.map((item) => ({
+            key: item.key,
+            label: item.label,
+            to: hrefWith(base, params, { source: item.value }),
+            prefetch: "intent" as const,
+          })),
+        ]}
+      />
+      {more && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={open ? "收起来源" : "展开全部来源"}
+          title={open ? "收起" : "全部来源"}
+          className="grid size-8 shrink-0 place-items-center rounded-full text-ink-4 transition-colors hover:bg-bg-sunk hover:text-ink-2 lg:size-7"
+        >
+          <IconChevronDown size={15} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function CompanyTabs({ base, entity, companies }: { base: string; entity: EntityFilter | null; companies: CompanyOption[] }) {
   const [params] = useSearchParams();
   const [open, setOpen] = useState(false);
