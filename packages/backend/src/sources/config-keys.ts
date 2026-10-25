@@ -22,7 +22,7 @@ const KEYS: Record<SourceRow["kind"], string[]> = {
   x_search: [...PUBLISHER, "_aihot", "ingestNoiseFilter", "itemUrlPrefixRewrite", "query", "searchType"],
   // 微博账号由自己的模块采集（后台「采集器」页）：发布方标记之外没有可配的采集项。
   weibo: [...PUBLISHER],
-  mp_account: [...PUBLISHER, "wxid", "ghid", "nickname"],
+  mp_account: [...PUBLISHER, "wxid", "ghid", "nickname", "provider", "bookId", "biz", "sourceArticleUrl"],
   external: [...PUBLISHER],
 };
 

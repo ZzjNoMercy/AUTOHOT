@@ -1,5 +1,5 @@
-// WeChat official accounts. Dajiala (极致了, a paid service) supplies each account's latest posts and
-// article bodies; every enabled account is checked once per source interval.
+// Dajiala-backed WeChat official accounts. WeRead-provider accounts use the crawlers module's own queue.
+// Dajiala supplies each account's latest posts and article bodies once per source interval.
 import { sql } from "../db.ts";
 import { upsertMaterial } from "../content/materials.ts";
 import { enqueue, QUEUES } from "../jobs/queue.ts";
@@ -31,7 +31,7 @@ async function fetchBody(url: string, sourceId: string, identity: string): Promi
 interface MpSource {
   id: string;
   name: string;
-  config: { wxid?: string; ghid?: string; nickname?: string };
+  config: { wxid?: string; ghid?: string; nickname?: string; provider?: string };
   cursor: Record<string, unknown> | null;
   enabled: boolean;
   participation_mode: string;
@@ -40,6 +40,7 @@ interface MpSource {
 export async function checkMpAccount(sourceId: string, reason: "schedule" | "manual") {
   const [source] = await sql<MpSource[]>`SELECT id, name, config, cursor, enabled, participation_mode FROM sources WHERE id = ${sourceId} AND kind = 'mp_account'`;
   if (!source) return { sourceId, status: "missing" as const };
+  if (source.config.provider === "weread") return { sourceId, status: "skipped" as const, reason: "weread source" };
   if (!source.enabled && reason !== "manual") return { sourceId, status: "paused" as const };
   const ghid = source.config.ghid ?? source.config.wxid;
   if (!ghid) return { sourceId, status: "unconfigured" as const };
@@ -127,7 +128,8 @@ export async function scheduleMpReconcile(now = new Date()) {
   // Without a key there is nothing to check the accounts with; saving one starts this at the next run.
   if (!(await dajialaConfigured())) return { enqueued: 0 };
   const rows = await sql<{ id: string; last: string | null; interval_minutes: number }[]>`
-    SELECT id, cursor->>'lastCheckedAt' AS last, interval_minutes FROM sources WHERE kind = 'mp_account' AND enabled`;
+    SELECT id, cursor->>'lastCheckedAt' AS last, interval_minutes FROM sources
+    WHERE kind = 'mp_account' AND enabled AND COALESCE(config->>'provider', 'dajiala') <> 'weread'`;
   let enqueued = 0;
   for (const s of rows) {
     const since = s.last ? now.getTime() - Date.parse(s.last) : Infinity;

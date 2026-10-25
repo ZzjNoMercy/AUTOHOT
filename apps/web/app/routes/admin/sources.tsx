@@ -6,6 +6,7 @@ import { adminGet } from "../../lib/admin.server";
 import { num } from "../../features/admin/format";
 import { HEALTH_LABEL, KIND_LABEL, MODE_LABEL } from "../../features/admin/labels";
 import { AdminPage, Badge, ButtonLink, Card, DataTable, Dot, FilterChips, healthTone, Input, Pager, Select, Stat, Time } from "../../features/admin/ui";
+import { SourceCollectionTabs } from "../../features/admin/SourceCollectionTabs";
 
 
 
@@ -26,6 +27,7 @@ export default function Sources({ loaderData }: Route.ComponentProps) {
       subtitle="列表按健康度排序：失败的在最前。点进详情可以预览抓取、手动采集、调整频率与参与方式。"
       actions={<ButtonLink to="/admin/sources/new" tone="primary">新建信源</ButtonLink>}
     >
+      <SourceCollectionTabs active="sources" />
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="全部" value={num(totals.total)} />
         <Stat label="启用" value={num(totals.enabled)} />

@@ -239,7 +239,7 @@ function ItemPreview({ preview }: { preview: FeedItemSummary }) {
       <PhoneBar back={{ to: preview.selected ? "/" : "/all", label: preview.selected ? "精选" : "全部" }} title={isX ? preview.x!.authorName : preview.title} />
       <article className="pb-6 pt-3" aria-busy="true">
         <div className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-3">
-          {isWeibo && <SourceAvatar name={preview.source.name} avatarUrl={preview.source.avatarUrl} size={20} />}
+          {(isWeibo || preview.source.avatarUrl) && <SourceAvatar name={preview.source.name} avatarUrl={preview.source.avatarUrl} size={20} />}
           <span className="font-semibold text-ink-2">{isX ? preview.x!.authorName : preview.source.name}</span>
           {isX && <span>· @{preview.x!.handle} · X</span>}
           {isWeibo && <span>· 微博</span>}
@@ -505,7 +505,7 @@ function ItemView({ item }: { item: SiteItemDetail }) {
         <div className="sticky top-0 z-20 -mx-2 hidden bg-bg/95 px-2 py-1.5 backdrop-blur lg:block 2xl:hidden">{backButton}</div>
         <article className="pb-6 pt-3 lg:pt-2 2xl:pt-1">
           <div className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-3 2xl:hidden ${isX ? "" : "mb-3"}`}>
-            {isWeibo && <SourceAvatar name={item.source.name} avatarUrl={item.source.avatarUrl} size={20} />}
+            {(isWeibo || item.source.avatarUrl) && <SourceAvatar name={item.source.name} avatarUrl={item.source.avatarUrl} size={20} />}
             <span className="font-semibold text-ink-2">{isX ? item.x!.authorName : item.source.name}</span>
             {isX && <span>· @{item.x!.handle} · X</span>}
             {isWeibo && <span>· 微博</span>}

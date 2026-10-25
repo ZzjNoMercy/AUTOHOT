@@ -32,7 +32,7 @@ const nav = (): Array<{ group: string; items: AdminNavEntry[] }> => [
     group: "内容",
     items: [
       { to: "/admin/content", label: "内容诊断" },
-      { to: "/admin/sources", label: "信源", count: "sources", tone: "bad" },
+      { to: "/admin/sources", label: "信源", count: "sources", tone: "bad", activePaths: ["/admin/crawlers"] },
       ...webModules().flatMap((m) => m.admin?.content ?? []),
       { to: "/admin/feedback", label: "反馈", count: "feedback", tone: "accent" },
     ],
@@ -62,16 +62,24 @@ function NavCount({ counts, countsKey, name, className }: Counts & { name: strin
   );
 }
 
-function NavItem({ to, label, count, counts, countsKey, tone }: AdminNavEntry & Counts) {
+function adminNavIsActive(item: Pick<AdminNavEntry, "to" | "activePaths">, pathname: string): boolean {
+  return [item.to, ...(item.activePaths ?? [])].some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
+function NavItem({ to, label, count, counts, countsKey, tone, activePaths }: AdminNavEntry & Counts) {
+  const location = useLocation();
   return (
     <NavLink to={to} className="group relative block">
-      {({ isActive }) => (
-        <span className={`relative flex items-center justify-between rounded-control px-3 py-[7px] text-[13.5px] transition-colors ${isActive ? "font-medium text-ink" : "text-ink-3 hover:text-ink"}`}>
-          {isActive && <motion.span layoutId="admin-nav" className="absolute inset-0 rounded-control bg-surface shadow-sm ring-1 ring-line" transition={{ type: "spring", stiffness: 520, damping: 38 }} />}
-          <span className="relative">{label}</span>
-          <NavCount counts={counts} countsKey={countsKey} name={count} className={`num relative min-w-5 rounded-full px-1.5 text-center text-[11px] font-semibold leading-5 ${tone === "bad" ? "bg-hot text-white" : "bg-accent-soft text-accent"}`} />
-        </span>
-      )}
+      {({ isActive }) => {
+        const active = isActive || adminNavIsActive({ to, activePaths }, location.pathname);
+        return (
+          <span className={`relative flex items-center justify-between rounded-control px-3 py-[7px] text-[13.5px] transition-colors ${active ? "font-medium text-ink" : "text-ink-3 hover:text-ink"}`}>
+            {active && <motion.span layoutId="admin-nav" className="absolute inset-0 rounded-control bg-surface shadow-sm ring-1 ring-line" transition={{ type: "spring", stiffness: 520, damping: 38 }} />}
+            <span className="relative">{label}</span>
+            <NavCount counts={counts} countsKey={countsKey} name={count} className={`num relative min-w-5 rounded-full px-1.5 text-center text-[11px] font-semibold leading-5 ${tone === "bad" ? "bg-hot text-white" : "bg-accent-soft text-accent"}`} />
+          </span>
+        );
+      }}
     </NavLink>
   );
 }
@@ -121,7 +129,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
           </div>
           <nav className="no-scrollbar flex gap-1 overflow-x-auto px-3 py-2">
             {flat.map((i) => {
-              const active = location.pathname === i.to || location.pathname.startsWith(`${i.to}/`);
+              const active = adminNavIsActive(i, location.pathname);
               return (
                 <NavLink key={i.to} to={i.to} className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-[13px] ${active ? "bg-ink text-bg" : "text-ink-3"}`}>
                   {i.label}

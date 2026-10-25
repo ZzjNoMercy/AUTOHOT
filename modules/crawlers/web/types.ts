@@ -34,11 +34,94 @@ export interface WeiboRow extends SourceState {
   iconOverride: string | null;
 }
 
+export type WereadAuthStatus = "missing" | "pending" | "valid" | "invalid" | "unknown";
+export type WereadCapability = "unknown" | "latest_only" | "list_available" | "blocked";
+
+export interface WereadAuthView {
+  status: WereadAuthStatus;
+  validatedAt: string | null;
+  lastErrorCode: string | null;
+  blockedUntil: string | null;
+  loginPending: boolean;
+  maskedVid: string | null;
+}
+
+export interface WereadArticle {
+  id: string;
+  title: string;
+  url: string;
+  publishedAt: string | null;
+  firstSeenAt: string;
+  bodyStatus: "pending" | "ok" | "unconfirmed" | "none";
+  contentStatus: "pending" | "ready" | "failed" | null;
+  contentError: string | null;
+}
+
+export interface MpFetchRun {
+  id: number;
+  startedAt: string;
+  finishedAt: string | null;
+  status: "running" | "ok" | "failed" | "skipped";
+  foundCount: number;
+  newCount: number;
+  error: string | null;
+  detail: {
+    reason?: "schedule" | "manual";
+    capability?: string;
+    title?: string;
+    reviewId?: string;
+    articleId?: string;
+    articleResult?: "created" | "already_stored";
+    contentStatus?: "ready" | "failed";
+    contentResult?: "fetched" | "already_ready" | "failed";
+    contentErrorCode?: string | null;
+    errorCode?: string;
+  } | null;
+}
+
 export interface MpRow extends SourceState {
   source_id: string;
   name: string;
   ghid: string | null;
   icon: string | null;
+  provider: "dajiala" | "weread";
+  bookId: string | null;
+  biz: string | null;
+  sourceArticleUrl: string | null;
+  wereadStatus: "pending_validation" | "active" | null;
+  capability: WereadCapability | null;
+  lastSeenReviewId: string | null;
+  wereadError: string | null;
+  lastCheckedAt: string | null;
+  nextCheckAt: string | null;
+  updatedAt: string;
+  articles: WereadArticle[];
+  runs: MpFetchRun[];
+}
+
+export interface WereadPreview {
+  resolved: { bookId: string; biz: string; numericId: string; articleUrl: string };
+  duplicate: { sourceId: string; name: string } | null;
+  name: string | null;
+  nameSource: "article" | "weread" | null;
+  status: "pending_validation" | "active";
+  capability: WereadCapability;
+  errorCode: string | null;
+  message: string | null;
+  latest: { title: string; reviewId: string; publishedAt: string | null } | null;
+}
+
+export interface WereadAddResult extends WereadPreview {
+  created: boolean;
+  sourceId?: string;
+  authRequired?: boolean;
+  check?: { status: string; contentStatus?: string; contentErrorCode?: string | null } | null;
+}
+
+export interface WereadQueueResult {
+  queued: boolean;
+  jobId?: string | null;
+  reason: "missing" | "auth_required" | "rate_limited" | "already_queued" | null;
 }
 
 export interface ClsRow extends SourceState {
@@ -49,9 +132,10 @@ export interface ClsRow extends SourceState {
 }
 
 export interface Overview {
-  weibo: { page: number; total: number; pageSize: number; rows: WeiboRow[] };
+  weibo: { page: number; total: number; pageSize: number; registered: string[]; rows: WeiboRow[] };
   mp: { total: number; dajiala: boolean; rows: MpRow[] };
   cls: ClsRow | null;
   credential: CredentialState;
+  weread: WereadAuthView;
   defaults: { weiboAccounts: Array<{ uid: string; name: string }>; clsTopics: Topic[] };
 }

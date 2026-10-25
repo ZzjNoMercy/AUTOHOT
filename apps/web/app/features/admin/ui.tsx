@@ -246,19 +246,20 @@ export function FilterChips({ param, options }: { param: string; options: Array<
   );
 }
 
-export function Pager({ page, hasMore }: { page: number; hasMore: boolean }) {
+export function Pager({ page, hasMore, total, pageSize }: { page: number; hasMore: boolean; total?: number; pageSize?: number }) {
   const [sp] = useSearchParams();
+  const pages = total !== undefined && pageSize ? Math.max(1, Math.ceil(total / pageSize)) : null;
   const to = (p: number) => {
     const next = new URLSearchParams(sp);
     if (p > 1) next.set("page", String(p));
     else next.delete("page");
     return `?${next}`;
   };
-  if (page <= 1 && !hasMore) return null;
+  if (pages !== null ? pages <= 1 : page <= 1 && !hasMore) return null;
   return (
     <div className="mt-4 flex items-center justify-center gap-2 text-[13px]">
       {page > 1 && <ButtonLink to={to(page - 1)} size="sm">上一页</ButtonLink>}
-      <span className="num px-2 text-ink-3">第 {page} 页</span>
+      <span className="num px-2 text-ink-3">第 {page}{pages !== null ? ` / ${pages}` : ""} 页</span>
       {hasMore && <ButtonLink to={to(page + 1)} size="sm">下一页</ButtonLink>}
     </div>
   );
@@ -285,6 +286,8 @@ export function ReasonDialog({
   confirmLabel = "确认",
   danger,
   requireReason = true,
+  showNote = true,
+  confirmDisabled = false,
   children,
   onClose,
   onSubmit,
@@ -296,6 +299,9 @@ export function ReasonDialog({
   confirmLabel?: string;
   danger?: boolean;
   requireReason?: boolean;
+  /** 不是审计动作的弹窗可以不要备注框。 */
+  showNote?: boolean;
+  confirmDisabled?: boolean;
   children?: ReactNode;
   onClose: () => void;
   onSubmit: (reason: string) => Promise<boolean | void> | boolean | void;
@@ -304,11 +310,11 @@ export function ReasonDialog({
   const [reason, setReason] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open || !showNote) return;
     setReason("");
     const t = setTimeout(() => ref.current?.focus(), 60);
     return () => clearTimeout(t);
-  }, [open]);
+  }, [open, showNote]);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -327,10 +333,10 @@ export function ReasonDialog({
             animate={{ y: 0, scale: 1, opacity: 1 }}
             exit={{ y: 10, scale: 0.98, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.25, 1, 0.5, 1] }}
-            className="relative w-full max-w-lg rounded-sheet bg-raised p-5 shadow-2xl ring-1 ring-line-strong"
+            className="relative max-h-[calc(100dvh-24px)] w-full max-w-lg overflow-y-auto rounded-sheet bg-raised p-5 shadow-2xl ring-1 ring-line-strong"
             onSubmit={async (e) => {
               e.preventDefault();
-              if (requireReason && !reason.trim()) return;
+              if (showNote && requireReason && !reason.trim()) return;
               const closed = await onSubmit(reason.trim());
               if (closed !== false) onClose();
             }}
@@ -338,14 +344,16 @@ export function ReasonDialog({
             <h2 className="text-[16px] font-semibold text-ink">{title}</h2>
             {description && <div className="mt-1.5 text-[13px] leading-relaxed text-ink-3">{description}</div>}
             {children && <div className="mt-4 space-y-3">{children}</div>}
-            <div className="mt-4">
-              <Field label={requireReason ? "原因（写进审计记录）" : "备注（可选）"}>
-                <Textarea ref={ref} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={requireReason ? "为什么做这个改动" : ""} rows={2} />
-              </Field>
-            </div>
+            {showNote && (
+              <div className="mt-4">
+                <Field label={requireReason ? "原因（写进审计记录）" : "备注（可选）"}>
+                  <Textarea ref={ref} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={requireReason ? "为什么做这个改动" : ""} rows={2} />
+                </Field>
+              </div>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <Button tone="ghost" onClick={onClose}>取消</Button>
-              <Button type="submit" tone={danger ? "danger" : "primary"} busy={busy} disabled={requireReason && !reason.trim()}>
+              <Button type="submit" tone={danger ? "danger" : "primary"} busy={busy} disabled={confirmDisabled || (showNote && requireReason && !reason.trim())}>
                 {confirmLabel}
               </Button>
             </div>

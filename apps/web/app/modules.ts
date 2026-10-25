@@ -12,6 +12,8 @@ import type { NavItem, Tab } from "./components/shell/nav";
 export interface AdminNavEntry {
   to: string;
   label: string;
+  /** Additional routes that belong to this navigation item. */
+  activePaths?: string[];
   /** The badge: a key of the admin's navigation counts (its server module's admin.counts). */
   count?: string;
   tone?: "bad" | "accent";

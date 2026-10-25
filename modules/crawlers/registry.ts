@@ -57,12 +57,12 @@ export interface CrawlerSourceRow {
 }
 
 /** 已登记的采集器信源 + 引擎那边的健康状态（后台页面用）。后台一页读多少行。 */
-export const CRAWLER_PAGE_SIZE = 50;
+export const CRAWLER_PAGE_SIZE = 10;
 
 /** 后台要的那一页微博账号，按信源 ID 稳定排序；总数交给页面判断还有没有下一页。 */
-export async function weiboSourceRows(page = 1): Promise<{ rows: CrawlerSourceRow[]; total: number }> {
+export async function weiboSourceRows(page = 1): Promise<{ rows: CrawlerSourceRow[]; total: number; registered: string[] }> {
   const offset = (Math.max(1, Math.floor(page)) - 1) * CRAWLER_PAGE_SIZE;
-  const [rows, [count]] = await Promise.all([
+  const [rows, [count], registered] = await Promise.all([
     sql<CrawlerSourceRow[]>`
       SELECT cs.source_id, cs.collector, cs.account, cs.label, s.name, s.enabled, s.participation_mode, s.tier,
              s.health, s.interval_minutes, s.last_ok_at, s.last_error,
@@ -72,8 +72,10 @@ export async function weiboSourceRows(page = 1): Promise<{ rows: CrawlerSourceRo
       ORDER BY cs.source_id
       LIMIT ${CRAWLER_PAGE_SIZE} OFFSET ${offset}`,
     sql<{ total: number }[]>`SELECT count(*)::int AS total FROM crawler_sources WHERE collector = 'weibo'`,
+    // 默认名单是否已经登记要看全部账号，不能只看当前这一页。
+    sql<{ account: string }[]>`SELECT account FROM crawler_sources WHERE collector = 'weibo' AND account IS NOT NULL`,
   ]);
-  return { rows, total: count!.total };
+  return { rows, total: count!.total, registered: registered.map((row) => row.account) };
 }
 
 /** 财联社那一条源：话题订阅挂在它上面，没建源时为空。 */
@@ -100,7 +102,40 @@ export async function clsSource(): Promise<ClsSourceRow | null> {
   return row ?? null;
 }
 
-/** 公众号清单（引擎的 mp_account 源）：账号由引擎的 mp 任务按频率检查，模块只管名单。 */
+export interface MpArticleRow {
+  id: string;
+  title: string;
+  url: string;
+  publishedAt: string | null;
+  firstSeenAt: string;
+  bodyStatus: "pending" | "ok" | "unconfirmed" | "none";
+  contentStatus: "pending" | "ready" | "failed" | null;
+  contentError: string | null;
+}
+
+export interface MpFetchRun {
+  id: number;
+  startedAt: string;
+  finishedAt: string | null;
+  status: "running" | "ok" | "failed" | "skipped";
+  foundCount: number;
+  newCount: number;
+  error: string | null;
+  detail: {
+    reason?: "schedule" | "manual";
+    capability?: string;
+    title?: string;
+    reviewId?: string;
+    articleId?: string;
+    articleResult?: "created" | "already_stored";
+    contentStatus?: "ready" | "failed";
+    contentResult?: "fetched" | "already_ready" | "failed";
+    contentErrorCode?: string | null;
+    errorCode?: string;
+  } | null;
+}
+
+/** 公众号清单同时表达旧 Dajiala 账号和模块维护的 WeRead 账号。 */
 export interface MpSourceRow {
   source_id: string;
   name: string;
@@ -111,16 +146,45 @@ export interface MpSourceRow {
   health: string;
   interval_minutes: number;
   last_ok_at: Date | null;
+  last_fetch_at: Date | null;
+  next_fetch_at: Date | null;
+  updated_at: Date;
   last_error: string | null;
   icon: string | null;
+  provider: "dajiala" | "weread";
+  book_id: string | null;
+  biz: string | null;
+  source_article_url: string | null;
+  weread_status: "pending_validation" | "active" | null;
+  capability: "unknown" | "latest_only" | "list_available" | "blocked" | null;
+  last_seen_review_id: string | null;
+  weread_error: string | null;
+  articles: MpArticleRow[];
+  runs: MpFetchRun[];
 }
 
 export async function mpSourceRows(): Promise<MpSourceRow[]> {
   return sql<MpSourceRow[]>`
-    SELECT id AS source_id, name, COALESCE(config ->> 'ghid', config ->> 'wxid') AS ghid, enabled, participation_mode, tier, health,
-           interval_minutes, last_ok_at, last_error, icon_url AS icon
-    FROM sources WHERE kind = 'mp_account'
-    ORDER BY health = 'failing' DESC, name`;
+    SELECT s.id AS source_id, s.name, COALESCE(s.config ->> 'ghid', s.config ->> 'wxid') AS ghid,
+           s.enabled, s.participation_mode, s.tier, s.health, s.interval_minutes,
+           s.last_ok_at, s.last_fetch_at, s.next_fetch_at, s.updated_at, s.last_error, s.icon_url AS icon,
+           COALESCE(s.config ->> 'provider', 'dajiala') AS provider,
+           COALESCE(w.book_id, s.config ->> 'bookId') AS book_id, w.biz, w.source_article_url,
+           w.status AS weread_status, w.capability, w.last_seen_review_id, w.last_error_code AS weread_error,
+           COALESCE((SELECT json_agg(items ORDER BY items."firstSeenAt" DESC) FROM (
+             SELECT a.id, a.title, a.url, a.published_at AS "publishedAt", a.discovered_at AS "firstSeenAt",
+                    a.body_status AS "bodyStatus", a.raw -> 'weread' ->> 'contentStatus' AS "contentStatus",
+                    a.raw -> 'weread' ->> 'contentError' AS "contentError"
+             FROM articles a WHERE a.source_id = s.id ORDER BY a.discovered_at DESC LIMIT 20
+           ) items), '[]'::json) AS articles,
+           COALESCE((SELECT json_agg(runs ORDER BY runs."startedAt" DESC) FROM (
+             SELECT f.id, f.started_at AS "startedAt", f.finished_at AS "finishedAt", f.status,
+                    f.found_count AS "foundCount", f.new_count AS "newCount", f.error, f.detail
+             FROM fetch_runs f WHERE f.source_id = s.id ORDER BY f.started_at DESC LIMIT 10
+           ) runs), '[]'::json) AS runs
+    FROM sources s LEFT JOIN crawler_weread_accounts w ON w.source_id = s.id
+    WHERE s.kind = 'mp_account'
+    ORDER BY s.health = 'failing' DESC, s.name`;
 }
 
 /** 保存财联社的话题订阅（没有源就先建一个 ext-cls）。 */

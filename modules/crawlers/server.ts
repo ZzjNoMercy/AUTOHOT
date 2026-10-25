@@ -15,6 +15,11 @@ import {
   CLS_TOPICS, COLLECTORS, collectorOf, CRAWLER_PAGE_SIZE, clsSource, DEFAULT_WEIBO_ACCOUNTS, mpSourceRows,
   registerCrawlerSource, saveClsTopics, setCrawlerIcon, weiboSourceRows, type Collector, type Topic,
 } from "./registry.ts";
+import { diagnoseWereadSession, pollWereadLogin, startWereadLogin, wereadAuthView } from "./weread-auth.ts";
+import {
+  addWereadAccount, enqueuePendingWereadAccounts, enqueueWereadBodyRetry, enqueueWereadCheck,
+  previewWereadAccount, scheduleWereadReconcile, wereadQueue,
+} from "./weread.ts";
 
 interface Admin { name: string; csrf: string }
 type Handler = (req: FastifyRequest, reply: FastifyReply, admin: Admin) => Promise<unknown>;
@@ -62,6 +67,13 @@ const MpAccountsBody = z.object({
   intervalMinutes: z.number().int().min(1).max(1440).default(60),
 }).strict();
 
+const WereadResolveBody = z.object({ articleUrl: z.string().trim().min(12).max(2048) }).strict();
+const WereadAccountBody = WereadResolveBody.extend({
+  participationMode: z.enum(["editorial", "hot_signal", "isolated"]).default("editorial"),
+  tier: z.enum(["T1", "T1_5", "T2", "EXCLUDE_MP"]).default("T2"),
+  intervalMinutes: z.number().int().min(1).max(1440).default(60),
+}).strict();
+
 /** 财联社的话题订阅：至少一个，ID 去重。 */
 const TopicsBody = z.object({
   topics: z.array(z.object({ id: z.string().regex(/^\d{1,10}$/), name: z.string().min(1).max(40) })).min(1).max(30),
@@ -96,14 +108,15 @@ function mpSourceId(ghid: string): string {
 }
 
 async function overview(page: number) {
-  const [weibo, mp, cls, dajiala, weiboCredential] = await Promise.all([
-    weiboSourceRows(page), mpSourceRows(), clsSource(), dajialaConfigured(), credentialView("weibo"),
+  const [weibo, mp, cls, dajiala, weiboCredential, weread] = await Promise.all([
+    weiboSourceRows(page), mpSourceRows(), clsSource(), dajialaConfigured(), credentialView("weibo"), wereadAuthView(),
   ]);
   return {
     weibo: {
       page,
       total: weibo.total,
       pageSize: CRAWLER_PAGE_SIZE,
+      registered: weibo.registered,
       // 头像走签名图片代理：sinaimg 会拒绝来自别的站点的浏览器请求，直接用它的地址在后台是空图。
       rows: weibo.rows.map((s) => ({
         ...s,
@@ -119,7 +132,23 @@ async function overview(page: number) {
         ...s,
         icon: s.icon ? proxiedImage(s.icon, "avatar") : null,
         lastOkAt: s.last_ok_at?.toISOString() ?? null,
+        lastCheckedAt: s.last_fetch_at?.toISOString() ?? null,
+        nextCheckAt: s.next_fetch_at?.toISOString() ?? null,
+        updatedAt: s.updated_at.toISOString(),
+        bookId: s.book_id,
+        sourceArticleUrl: s.source_article_url,
+        wereadStatus: s.weread_status,
+        lastSeenReviewId: s.last_seen_review_id,
+        wereadError: s.weread_error,
         last_ok_at: undefined,
+        last_fetch_at: undefined,
+        next_fetch_at: undefined,
+        updated_at: undefined,
+        book_id: undefined,
+        source_article_url: undefined,
+        weread_status: undefined,
+        last_seen_review_id: undefined,
+        weread_error: undefined,
       })),
     },
     cls: cls
@@ -131,6 +160,7 @@ async function overview(page: number) {
         }
       : null,
     credential: weiboCredential,
+    weread,
     defaults: { weiboAccounts: DEFAULT_WEIBO_ACCOUNTS, clsTopics: CLS_TOPICS },
   };
 }
@@ -138,7 +168,11 @@ async function overview(page: number) {
 export const crawlersServer = defineServerModule({
   name: "crawlers",
   // 每分钟把到点的采集器源派出去（和引擎的 cron.sources.schedule 同一个节奏）。
-  schedules: [{ name: "crawlers.dispatch", cron: "* * * * *", run: () => dispatchCrawlers() }],
+  schedules: [
+    { name: "crawlers.dispatch", cron: "* * * * *", run: () => dispatchCrawlers() },
+    { name: "crawlers.weread-reconcile", cron: "* * * * *", run: () => scheduleWereadReconcile(), when: () => process.env.COLLECT_ENABLED === "true" },
+  ],
+  queues: [wereadQueue],
   // 采集器信源由模块自己采集：微博是引擎的 weibo 类型（页面上标出平台），财联社仍是 external。
   // 引擎的采集循环本来就跳过 external，weibo 也在 collect.ts 里跳过。
   sourceKinds: {
@@ -154,10 +188,21 @@ export const crawlersServer = defineServerModule({
         return { ...(await fetchCrawlerSource(source.id)) };
       },
     },
+    mp_account: {
+      fetchNow: async (source) => {
+        if (source.config.provider === "weread") {
+          const result = await enqueueWereadCheck(source.id, "manual");
+          if (!result.queued) throw Object.assign(new Error(result.reason === "auth_required" ? "需要先完成微信读书授权" : "检查任务已在队列中或暂时受限"), { statusCode: 409 });
+          return { jobId: result.jobId ?? null };
+        }
+        const jobId = await enqueue(QUEUES.mpCheck, { sourceId: source.id, reason: "manual" }, { singletonKey: `mp:${source.id}` });
+        return { jobId };
+      },
+    },
   },
   admin: {
-    // 设置页的「采集凭据」：微博登录态和 Dajiala key 放在一起；保存仍走本模块自己的接口。
-    settings: async () => ({ weibo: await credentialView("weibo") }),
+    // 设置页的「采集凭据」：微信读书与微博只回公共状态；密钥和 Cookie 不进入网页响应。
+    settings: async () => ({ weibo: await credentialView("weibo"), weread: await wereadAuthView() }),
   },
   http(app: FastifyInstance) {
     // 一页一页读：账号多了以后页面不能一次拉全部行。
@@ -166,15 +211,63 @@ export const crawlersServer = defineServerModule({
       return reply.send(await overview(page));
     }));
 
-    // 「全部抓一次」：微博/财联社忽略下次抓取时间串行跑一遍；公众号排进 mp 队列（排查用）。
+    // 「全部抓一次」：按公众号自己的提供方分派，不把 WeRead 账号送进付费队列。
     app.post("/api/admin/crawlers/run", guard(async (_req, reply) => {
       const crawlers = await dispatchCrawlers(true);
-      const accounts = await sql<{ id: string }[]>`SELECT id FROM sources WHERE kind = 'mp_account' AND enabled`;
-      let enqueued = 0;
+      const accounts = await sql<{ id: string; provider: string }[]>`
+        SELECT id, COALESCE(config ->> 'provider', 'dajiala') AS provider FROM sources WHERE kind = 'mp_account' AND enabled`;
+      let mp = 0;
+      let weread = 0;
+      let wereadSkipped = 0;
       for (const account of accounts) {
-        if (await enqueue(QUEUES.mpCheck, { sourceId: account.id, reason: "manual" }, { singletonKey: `mp:${account.id}` })) enqueued += 1;
+        if (account.provider === "weread") {
+          const result = await enqueueWereadCheck(account.id, "manual");
+          if (result.queued) weread += 1;
+          else wereadSkipped += 1;
+        } else if (await enqueue(QUEUES.mpCheck, { sourceId: account.id, reason: "manual" }, { singletonKey: `mp:${account.id}` })) mp += 1;
       }
-      return reply.send({ ok: true, ...crawlers, mp: enqueued });
+      return reply.send({ ok: true, ...crawlers, mp, weread, wereadSkipped });
+    }));
+
+    app.post("/api/admin/crawlers/weread/resolve", guard(async (req, reply) => {
+      const body = WereadResolveBody.parse(req.body ?? {});
+      return reply.send(await previewWereadAccount(body.articleUrl));
+    }));
+
+    app.post("/api/admin/crawlers/weread/accounts", guard(async (req, reply, admin) => {
+      const body = WereadAccountBody.parse(req.body ?? {});
+      return reply.send(await addWereadAccount(body, admin.name));
+    }));
+
+    app.post("/api/admin/crawlers/weread/login", guard(async (_req, reply, admin) => {
+      return reply.send(await startWereadLogin(admin.name));
+    }));
+
+    app.get("/api/admin/crawlers/weread/login/:flowId", guard(async (req, reply, admin) => {
+      const { flowId } = z.object({ flowId: z.string().uuid() }).parse(req.params);
+      const result = await pollWereadLogin(flowId, admin.name);
+      const resumed = result.status === "succeeded" ? await enqueuePendingWereadAccounts() : 0;
+      return reply.send({ ...result, resumed });
+    }));
+
+    app.post("/api/admin/crawlers/weread/validate", guard(async (_req, reply, admin) => {
+      const auth = await diagnoseWereadSession(admin.name);
+      const resumed = auth.status === "valid" ? await enqueuePendingWereadAccounts() : 0;
+      return reply.send({ auth, resumed });
+    }));
+
+    app.post("/api/admin/crawlers/weread/accounts/:sourceId/check", guard(async (req, reply) => {
+      const { sourceId } = z.object({ sourceId: z.string().min(1).max(80) }).parse(req.params);
+      const result = await enqueueWereadCheck(sourceId, "manual");
+      if (result.reason === "missing") return reply.code(404).send({ detail: "微信读书监测账号不存在" });
+      return reply.send(result);
+    }));
+
+    app.post("/api/admin/crawlers/weread/articles/:articleId/retry-body", guard(async (req, reply, admin) => {
+      const { articleId } = z.object({ articleId: z.string().min(1).max(80) }).parse(req.params);
+      const result = await enqueueWereadBodyRetry(articleId, admin.name);
+      if (result.reason === "missing") return reply.code(404).send({ detail: "微信读书文章不存在" });
+      return reply.send(result);
     }));
 
     app.post("/api/admin/crawlers/credentials", guard(async (req, reply, admin) => {

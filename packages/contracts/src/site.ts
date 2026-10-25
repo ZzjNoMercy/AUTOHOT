@@ -6,8 +6,8 @@ export interface SourceRef {
   /** The name readers see (publication/rules.ts publicSourceName), as is every source name here. */
   name: string;
   /**
-   * The account's avatar, for sources that are an account rather than an outlet (weibo); a proxied
-   * URL. News sources keep their name alone, as they always have.
+   * The account's avatar for account-based sources (weibo, WeRead); usually a proxied URL.
+   * WeRead uses the local WeChat logo when the account has no avatar.
    */
   avatarUrl?: string | null;
 }
