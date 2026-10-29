@@ -15,6 +15,8 @@ import {
   CLS_TOPICS, COLLECTORS, collectorOf, CRAWLER_PAGE_SIZE, clsSource, DEFAULT_WEIBO_ACCOUNTS, mpSourceRows,
   registerCrawlerSource, saveClsTopics, setCrawlerIcon, weiboSourceRows, type Collector, type Topic,
 } from "./registry.ts";
+import { listFetchRuns } from "./runs.ts";
+import { testWeiboCredentials } from "./weibo.ts";
 import { diagnoseWereadSession, pollWereadLogin, startWereadLogin, wereadAuthView } from "./weread-auth.ts";
 import {
   addWereadAccount, enqueuePendingWereadAccounts, enqueueWereadBodyRetry, enqueueWereadCheck,
@@ -211,6 +213,14 @@ export const crawlersServer = defineServerModule({
       return reply.send(await overview(page));
     }));
 
+    app.get("/api/admin/crawlers/runs/:sourceId", guard(async (req, reply) => {
+      const { sourceId } = z.object({ sourceId: z.string().min(1).max(80) }).parse(req.params);
+      const page = Math.max(1, Number((req.query as { page?: string } | undefined)?.page) || 1);
+      const result = await listFetchRuns(sourceId, page);
+      if (!result) return reply.code(404).send({ detail: "信源不存在" });
+      return reply.send(result);
+    }));
+
     // 「全部抓一次」：按公众号自己的提供方分派，不把 WeRead 账号送进付费队列。
     app.post("/api/admin/crawlers/run", guard(async (_req, reply) => {
       const crawlers = await dispatchCrawlers(true);
@@ -268,6 +278,12 @@ export const crawlersServer = defineServerModule({
       const result = await enqueueWereadBodyRetry(articleId, admin.name);
       if (result.reason === "missing") return reply.code(404).send({ detail: "微信读书文章不存在" });
       return reply.send(result);
+    }));
+
+    app.post("/api/admin/crawlers/weibo/test", guard(async (_req, reply) => {
+      const uid = (await weiboSourceRows(1)).rows[0]?.account ?? DEFAULT_WEIBO_ACCOUNTS[0]?.uid;
+      if (!uid) return reply.send({ ok: false, error: "还没有微博账号，请先在「采集 → 微博」添加账号" });
+      return reply.send(await testWeiboCredentials(uid));
     }));
 
     app.post("/api/admin/crawlers/credentials", guard(async (req, reply, admin) => {

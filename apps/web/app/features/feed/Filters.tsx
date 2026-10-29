@@ -4,18 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { Form, Link, useNavigation, useSearchParams } from "react-router";
 import { CATEGORY_KEYS, CATEGORY_LABELS, CHANNEL_LABELS, type CategoryKey, type ChannelKey } from "@aihot/contracts/taxonomy";
 import type { CompanyOption, EntityFilter, SourceOption, SourcePlatformOption } from "@aihot/contracts/site";
-import { SITE } from "@aihot/site";
+import { SITE, SOURCE_FILTERS } from "@aihot/site";
 import { IconCheck, IconChevronDown, IconClose, IconFilter, IconSearch } from "../../components/icons";
 import { PillTabs } from "../../components/ui/Tabs";
 import { Sheet } from "../../components/ui/Sheet";
 import { Wordmark } from "@aihot/site/brand/Logo.tsx";
 import { BarButton, PhoneBar } from "../../components/shell/PhoneBar";
 import { openSearch } from "../search/SearchOverlay";
+import { sourceFilterItems } from "./source-filters";
 
-const PLATFORM_LABELS: Record<string, string> = {
-  weibo: "微博", mp_account: "公众号", x_search: "X", rss: "RSS", web_list: "网页", json_list: "JSON", external: "外部上报",
-};
-export const platformLabel = (kind: string) => PLATFORM_LABELS[kind] ?? kind;
+export { platformLabel } from "./source-filters";
 
 /** Same page with some query parameters changed (paging state dropped). */
 function hrefWith(base: string, params: URLSearchParams, patch: Record<string, string | null>) {
@@ -135,9 +133,7 @@ function FilterSheet({ open, onClose, base, active, entity, companies, source, s
           <ul className="mx-4 divide-y divide-line-soft">
             {[
               { key: "", label: "不限", on: !source },
-              ...platforms.filter((p) => p.kind === "weibo" || p.kind === "mp_account" || p.kind === "x_search")
-                .map((p) => ({ key: `kind:${p.kind}`, label: `${platformLabel(p.kind)} ${p.count}`, on: source === `kind:${p.kind}` })),
-              ...sources.map((s) => ({ key: s.id, label: `${s.name} ${s.count}`, on: source === s.id })),
+              ...sourceFilterItems(sources, platforms).map((item) => ({ key: item.key, label: item.label, on: source === item.key })),
             ].map((item, i) => (
               <li key={item.key || `source-none-${i}`}>
                 <Link to={hrefWith(base, params, { source: item.key || null })} onClick={onClose} aria-current={item.on ? "true" : undefined} className={row(item.on)}>
@@ -182,7 +178,7 @@ export function ActiveFilters({ base, category, channel, entity = null, tag, sou
   const chips: Array<{ key: string; text: string; clear: Record<string, string | null> }> = [];
   if (label) chips.push({ key: "scope", text: `只看${label}`, clear: { category: null, channel: null } });
   if (entity) chips.push({ key: "entity", text: `公司：${entity.name}`, clear: { entity: null } });
-  if (source) chips.push({ key: "source", text: `来源：${sourceLabel ?? source}`, clear: { source: null } });
+  if (source) chips.push({ key: "source", text: `来源：${SOURCE_FILTERS.labels[source] ?? sourceLabel ?? source}`, clear: { source: null } });
   if (tag) chips.push({ key: "tag", text: `#${tag}`, clear: { tag: null } });
   if (q) chips.push({ key: "q", text: `搜索：${q}`, clear: { q: null } });
   if (!chips.length) return null;
@@ -215,11 +211,7 @@ export function SourceTabs({ base, source, sources, platforms }: { base: string;
   const [params] = useSearchParams();
   const [open, setOpen] = useState(false);
   if (!sources.length && !platforms.length) return null;
-  const platformItems = platforms
-    .filter((p) => p.kind === "weibo" || p.kind === "mp_account" || p.kind === "x_search")
-    .map((p) => ({ key: `kind:${p.kind}`, label: `${platformLabel(p.kind)} ${p.count}`, value: `kind:${p.kind}` }));
-  const sourceItems = sources.map((s) => ({ key: s.id, label: `${s.name} ${s.count}`, value: s.id }));
-  const items = [...platformItems, ...sourceItems];
+  const items = sourceFilterItems(sources, platforms);
   const more = items.length > 8;
   const shown = open || !more ? items : items.slice(0, 8);
   return (

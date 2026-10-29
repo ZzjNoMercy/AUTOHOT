@@ -3,6 +3,9 @@ import { defineModule } from "@aihot/contracts/modules";
 
 export const crawlers = defineModule({
   name: "crawlers",
-  adminPages: [{ path: "admin/crawlers", file: "web/page.tsx" }],
+  adminPages: [
+    { path: "admin/crawlers", file: "web/page.tsx" },
+    { path: "admin/crawlers/runs/:sourceId", file: "web/runs.tsx" },
+  ],
   apiPaths: [/^\/api\/admin\/crawlers/],
 });

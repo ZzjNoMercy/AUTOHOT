@@ -109,7 +109,7 @@ test("storage preserves finite future claims and existing timeline boundaries", 
     assert.equal(row.published_at?.getTime() ?? null, c.trusted ? c.claim.getTime() : null, c.name);
     assert.equal(row.backfill, c.backfill !== null, c.name);
     assert.equal(row.backfill_reason, c.backfill, c.name);
-    assert.equal(row.timeline_at.getTime(), c.backfill && c.trusted ? c.claim.getTime() : discoveredAt.getTime(), c.name);
+    assert.equal(row.timeline_at.getTime(), c.trusted ? c.claim.getTime() : discoveredAt.getTime(), c.name);
   }
 });
 

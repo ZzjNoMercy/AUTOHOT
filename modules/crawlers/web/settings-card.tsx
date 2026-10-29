@@ -159,17 +159,32 @@ function WereadCredentialsCard({ weread }: { weread?: WereadAuthView }) {
   );
 }
 
+interface WeiboTestResult { ok: boolean; count?: number; error?: string }
+
 function WeiboCredentialsCard({ data }: { data: unknown }) {
   const { run, pending } = useAdminAction();
   const weibo = (data as { weibo?: WeiboCredential } | undefined)?.weibo;
   const [cookie, setCookie] = useState("");
   const [xsrfToken, setXsrfToken] = useState("");
+  const [testResult, setTestResult] = useState<WeiboTestResult | null>(null);
 
   const save = () =>
-    run("POST", "/api/admin/crawlers/credentials", { collector: "weibo", fields: { cookie, xsrfToken } }, {
+    run<{ ok: boolean }>("POST", "/api/admin/crawlers/credentials", { collector: "weibo", fields: { cookie, xsrfToken } }, {
       label: "crawler-credentials",
-      success: "已保存，下一次抓取就用新的登录态",
-    }).then((ok) => { if (ok) { setCookie(""); setXsrfToken(""); } });
+      success: "已保存，请测试确认登录态是否有效",
+    }).then((result) => {
+      if (result?.ok) {
+        setCookie("");
+        setXsrfToken("");
+        setTestResult(null);
+      }
+    });
+
+  const test = async () => {
+    setTestResult(null);
+    const result = await run<WeiboTestResult>("POST", "/api/admin/crawlers/weibo/test", {}, { label: "weibo-test", revalidate: false });
+    if (result) setTestResult(result);
+  };
 
   return (
     <Card
@@ -183,7 +198,14 @@ function WeiboCredentialsCard({ data }: { data: unknown }) {
         <Field label="cookie" hint="登录 weibo.com 后从浏览器开发者工具复制整条 cookie；过期后回来粘新的即可。"><Textarea rows={4} className="font-mono !text-[12.5px]" value={cookie} onChange={(event) => setCookie(event.target.value)} placeholder="SUB=…; SUBP=…; SSOLoginState=…" /></Field>
         <Field label="XSRF token" hint="同一处的 x-xsrf-token（与 cookie 里的 XSRF-TOKEN 一致）。"><Input className="max-w-[420px] font-mono" value={xsrfToken} onChange={(event) => setXsrfToken(event.target.value)} placeholder="-U-95ib93VtfZVvV6BAFMB31" /></Field>
       </div>
-      <div className="mt-4 flex items-center justify-end gap-3 border-t border-line pt-4"><span className="text-[12px] text-ink-4">保存后下一次抓取就用新的登录态。</span><Button tone="primary" busy={pending === "crawler-credentials"} disabled={!cookie.trim() || !xsrfToken.trim()} onClick={() => void save()}>保存登录态</Button></div>
+      {testResult && <div role="status" className={`mt-4 text-[12.5px] leading-relaxed ${testResult.ok ? "text-ok" : "text-hot"}`}>{testResult.ok ? `刚刚取到 ${testResult.count ?? 0} 条，登录态有效` : `测试未通过：${testResult.error ?? "微博没有返回可用内容"}`}</div>}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+        <span className="text-[12px] leading-relaxed text-ink-4">测试使用后台已保存的凭据；保存不等于验证成功。</span>
+        <div className="flex gap-2">
+          <Button tone="secondary" busy={pending === "weibo-test"} disabled={!weibo?.saved || pending === "crawler-credentials"} onClick={() => void test()}>测试登录态</Button>
+          <Button tone="primary" busy={pending === "crawler-credentials"} disabled={!cookie.trim() || !xsrfToken.trim() || pending === "weibo-test"} onClick={() => void save()}>保存登录态</Button>
+        </div>
+      </div>
     </Card>
   );
 }

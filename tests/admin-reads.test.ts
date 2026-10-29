@@ -25,11 +25,11 @@ test("source pages retain order and count selected history regardless of public 
     SELECT id, title, source_id, 'news', url, discovered_at, timeline_at, timeline_at, 'withdrawn', true
     FROM articles WHERE source_id = 'page-001'`;
   const first = await listSources({ q: "Page" });
-  assert.equal(first.rows.length, 100);
+  assert.equal(first.rows.length, 20);
   assert.deepEqual(first.rows.slice(0, 3).map(row => row.id), ["page-103", "page-102", "page-001"]);
   assert.equal(first.rows[2]!.items_7d, 1);
   assert.equal(first.rows[2]!.selected_30d, 3);
-  const second = await listSources({ q: "Page", page: 2 });
+  const second = await listSources({ q: "Page", page: 6 });
   assert.deepEqual(second.rows.map(row => row.id), ["page-099", "page-100", "page-101", "page-104"]);
   assert.deepEqual(second.totals, first.totals);
   const detail = await sourceDetail("page-001");

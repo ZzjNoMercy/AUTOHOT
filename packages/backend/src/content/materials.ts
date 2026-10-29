@@ -76,7 +76,7 @@ export interface TimelineDecision {
   backfillReason: string | null;
 }
 
-/** The one timeline rule shared by every entrance. */
+/** Original publication time drives the timeline; discovery is only a fallback when that time is unknown. */
 export function decideTimeline(claimed: Date | null | undefined, discoveredAt: Date, explicitBackfill?: string | null): TimelineDecision {
   let publishedAt: Date | null = claimed && Number.isFinite(claimed.getTime()) ? claimed : null;
   if (publishedAt && publishedAt.getTime() > discoveredAt.getTime() + FUTURE_TOLERANCE_MS) publishedAt = null;
@@ -85,7 +85,7 @@ export function decideTimeline(claimed: Date | null | undefined, discoveredAt: D
   else if (!publishedAt) backfillReason = "unknown-publication-time";
   else if (publishedAt && discoveredAt.getTime() - publishedAt.getTime() > STALE_ON_DISCOVERY_MS) backfillReason = "stale-on-discovery";
   const backfill = backfillReason !== null;
-  const timelineAt = backfill && publishedAt ? publishedAt : discoveredAt;
+  const timelineAt = publishedAt ?? discoveredAt;
   return { publishedAt, timelineAt, backfill, backfillReason };
 }
 

@@ -6,7 +6,8 @@ import { HEALTH_LABEL } from "@aihot/web/features/admin/labels";
 import { Badge, Button, ButtonLink, Card, DataTable, Field, Input, KV, ReasonDialog, Select, Textarea, Time, healthTone } from "@aihot/web/features/admin/ui";
 import { Sheet } from "@aihot/web/components/ui/Sheet";
 import { Avatar } from "./avatar";
-import type { MpFetchRun, MpRow, WereadAddResult, WereadArticle, WereadAuthView, WereadPreview, WereadQueueResult } from "./types";
+import { FetchRunBadge } from "./run-utils";
+import type { MpRow, WereadAddResult, WereadArticle, WereadAuthView, WereadPreview, WereadQueueResult } from "./types";
 
 const MODE_LABEL: Record<string, string> = { editorial: "进精选", hot_signal: "只作热度证据", isolated: "不上站" };
 const ERROR_LABEL: Record<string, string> = {
@@ -14,12 +15,6 @@ const ERROR_LABEL: Record<string, string> = {
   rate_limited: "微信读书正在访问冷却，请稍后再试",
   already_queued: "任务已在队列中",
 };
-const RUN_STATUS = {
-  ok: { label: "成功", tone: "ok" },
-  failed: { label: "失败", tone: "bad" },
-  skipped: { label: "跳过", tone: "muted" },
-  running: { label: "进行中", tone: "accent" },
-} as const;
 
 interface Draft { ghid: string; name: string; problem: string | null }
 interface ImportResult {
@@ -59,11 +54,6 @@ function ArticleBodyStatus({ article }: { article: WereadArticle }) {
   if (article.bodyStatus === "ok" || article.contentStatus === "ready") return <Badge tone="ok">正文已取得</Badge>;
   if (article.contentStatus === "failed" || article.bodyStatus === "none") return <Badge tone="bad">正文失败</Badge>;
   return <Badge tone="warn">正文待读取</Badge>;
-}
-
-function FetchRunBadge({ run }: { run: MpFetchRun }) {
-  const status = RUN_STATUS[run.status];
-  return <Badge tone={status.tone}>{status.label}</Badge>;
 }
 
 export function MpAccountsCard({ data, weread }: { data: { total: number; dajiala: boolean; rows: MpRow[] }; weread: WereadAuthView }) {
@@ -256,8 +246,11 @@ export function MpAccountsCard({ data, weread }: { data: { total: number; dajial
             ["最近成功", <Time at={detail.lastOkAt} />],
           ]} />
           <section>
-            <h3 className="mb-2 text-[12px] font-medium text-ink-3">最近检查记录</h3>
-            {detail.runs.length ? <div className="space-y-2">{detail.runs.map((run) => (
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-[12px] font-medium text-ink-3">最近检查记录</h3>
+              <ButtonLink to={`/admin/crawlers/runs/${encodeURIComponent(detail.source_id)}`} size="sm" tone="ghost">查看全部</ButtonLink>
+            </div>
+            {detail.runs.length ? <div className="space-y-2">{detail.runs.slice(0, 5).map((run) => (
               <div key={run.id} className="rounded-control bg-bg-sunk/60 px-3 py-2.5 ring-1 ring-line">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2"><FetchRunBadge run={run} />{run.detail?.reason && <span className="text-[11.5px] text-ink-4">{run.detail.reason === "schedule" ? "定时检查" : "手动检查"}</span>}</div>

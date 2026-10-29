@@ -9,6 +9,7 @@ import {
 } from "../weread-auth.ts";
 import { addWereadAccount, checkWereadAccount, previewWereadAccount, retryWereadBody } from "../weread.ts";
 import { mpSourceRows } from "../registry.ts";
+import { listFetchRuns } from "../runs.ts";
 
 const BIZ = "MzIyMTAzMzU3OA==";
 const BOOK_ID = "MP_WXS_3221033578";
@@ -257,6 +258,11 @@ test("公众号清单返回真实 WeRead 身份和文章状态", async () => {
   assert.equal(row?.runs[0]?.detail?.articleResult, "created");
   assert.equal(row?.runs[0]?.detail?.contentResult, "fetched");
   assert.equal(row?.runs[0]?.detail?.title, "比亚迪最新文章");
+  const logPage = await listFetchRuns("mp-weread-3221033578", 1);
+  assert.equal(logPage?.source.name, "迪fans");
+  assert.equal(logPage?.pageSize, 20);
+  assert.equal(logPage?.total, 1);
+  assert.equal(logPage?.runs[0]?.status, "ok");
   assert.equal(sawSessionCookie, true);
   assert.ok(coverCalls > 0);
 });

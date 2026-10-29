@@ -1,6 +1,6 @@
 // Failure cases: a composite or mention folding into a fact; stale fact membership still folding;
 // a future/withdrawn/unselected report affecting the anchor; filters choosing an anchor outside their
-// own set; a later report moving a fact; equal-time standalone cards changing cursor order.
+// own set; discovery order replacing original publication time; equal-time standalone cards changing cursor order.
 import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
@@ -59,4 +59,27 @@ test("timeline grouping preserves evidence scope and filter-local anchors", asyn
     cursor = page.nextCursor;
   } while (cursor);
   assert.equal(JSON.stringify(paged), JSON.stringify(full.cards));
+});
+
+test("timeline order and day counts use publication time rather than discovery order", async () => {
+  const prefix = `timeline-published-${tag()}`;
+  await sql`INSERT INTO sources (id, name, kind, tier) VALUES (${prefix}, ${prefix}, 'rss', 'T1')`;
+  const entries = [
+    { id: `${prefix}-previous-day`, published: "2026-01-01T15:30:00.000Z", discovered: "2026-01-02T02:30:00.000Z" },
+    { id: `${prefix}-latest`, published: "2026-01-02T02:00:00.000Z", discovered: "2026-01-02T01:45:00.000Z" },
+  ];
+  for (const entry of entries) {
+    const published = new Date(entry.published);
+    const discovered = new Date(entry.discovered);
+    await sql`INSERT INTO articles (id, source_id, identity_key, url, title, published_at, discovered_at, timeline_at)
+      VALUES (${entry.id}, ${prefix}, ${entry.id}, ${`https://example.org/${entry.id}`}, ${entry.id}, ${published}, ${discovered}, ${published})`;
+    await sql`INSERT INTO publications (article_id, source_id, title, url, published_at, discovered_at, timeline_at, sort_at, visible_after, selected, eligible, visibility, channel, tags)
+      VALUES (${entry.id}, ${prefix}, ${entry.id}, ${`https://example.org/${entry.id}`}, ${published}, ${discovered}, ${published}, ${discovered}, ${discovered}, true, true, 'public', 'news', ${[prefix]})`;
+  }
+  const result = await loadTimeline({ channel: "all", category: null, tag: prefix, now: new Date("2026-01-02T03:00:00.000Z") });
+  assert.deepEqual(result.cards.map(card => [card.key, card.anchorAt, card.item.publishedAt, card.item.timelineAt]), [
+    [`a${prefix}-latest`, entries[1]!.published, entries[1]!.published, entries[1]!.published],
+    [`a${prefix}-previous-day`, entries[0]!.published, entries[0]!.published, entries[0]!.published],
+  ]);
+  assert.deepEqual(result.dayCounts, { "2026-01-02": 1, "2026-01-01": 1 });
 });

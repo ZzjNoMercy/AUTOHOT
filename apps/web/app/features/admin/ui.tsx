@@ -1,7 +1,7 @@
 // Shared admin building blocks: page frame, cards, stats, badges, tables, buttons, fields and a
 // reason dialog (manual changes always carry a reason for the audit log).
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
 import { ago, bj } from "./format";
 
@@ -192,11 +192,10 @@ export function ButtonLink({ to, children, tone = "secondary", size = "md" }: { 
 const INPUT = "w-full rounded-control bg-surface px-3 py-2 text-[13.5px] text-ink ring-1 ring-line-strong outline-none transition-shadow placeholder:text-ink-4 focus:ring-2 focus:ring-accent";
 
 export function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
-  const id = useId();
   return (
-    <label htmlFor={id} className="block">
+    <label className="block">
       <span className="mb-1 block text-[12.5px] font-medium text-ink-2">{label}</span>
-      <span className="[&>*]:w-full" id={id}>{children}</span>
+      <span className="[&>*]:w-full">{children}</span>
       {hint && <span className="mt-1 block text-[12px] text-ink-4">{hint}</span>}
     </label>
   );

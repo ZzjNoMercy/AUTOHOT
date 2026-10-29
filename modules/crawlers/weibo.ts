@@ -81,28 +81,50 @@ async function toItem(post: WeiboPost, uid: string, headers: ReturnType<typeof h
   };
 }
 
-/** 一个账号的前两页（原脚本的口径），置顶和头条文章跳过。头像一起带回来，页面上给账号显示。 */
-export async function collectWeibo(uid: string): Promise<CollectResult> {
+async function requireWeiboCredentials(): Promise<Record<string, string>> {
   const credentials = await getCredentials("weibo");
   if (!credentials?.cookie?.trim() || !credentials?.xsrfToken?.trim()) {
     throw new Error("微博登录态未设置：到后台「设置 → 采集凭据」填 cookie 和 XSRF token");
   }
+  return credentials;
+}
+
+async function fetchWeiboPage(uid: string, page: string, credentials: Record<string, string>, fetcher: typeof fetch, sinceId?: string) {
+  const params = new URLSearchParams({ uid, page, feature: "0", ...(sinceId ? { since_id: sinceId } : {}) });
+  const res = await fetcher(`https://weibo.com/ajax/statuses/mymblog?${params}`, { headers: headersFor(uid, credentials), signal: AbortSignal.timeout(20_000) });
+  if (res.status !== 200) throw new Error(`微博 HTTP ${res.status}：登录态可能已失效，请到后台「设置 → 采集凭据」更新 cookie`);
+  const json = (await res.json()) as { data?: { list?: WeiboPost[]; since_id?: string } };
+  const list = json.data?.list;
+  if (!Array.isArray(list)) throw new Error("微博返回里没有 data.list：登录态已失效，请到后台「设置 → 采集凭据」更新 cookie 和 XSRF token");
+  return { list, since_id: json.data?.since_id };
+}
+
+/** 一个账号的前两页（原脚本的口径），置顶和头条文章跳过。头像一起带回来，页面上给账号显示。 */
+export async function collectWeibo(uid: string, fetcher: typeof fetch = fetch): Promise<CollectResult> {
+  const credentials = await requireWeiboCredentials();
   const headers = headersFor(uid, credentials);
   const out: CrawledItem[] = [];
   let avatar: string | null = null;
   let sinceId: string | undefined;
   for (const page of ["1", "2"]) {
-    const params = new URLSearchParams({ uid, page, feature: "0", ...(sinceId ? { since_id: sinceId } : {}) });
-    const res = await fetch(`https://weibo.com/ajax/statuses/mymblog?${params}`, { headers, signal: AbortSignal.timeout(20_000) });
-    if (res.status !== 200) throw new Error(`微博 HTTP ${res.status}：登录态可能已失效，请到后台「设置 → 采集凭据」更新 cookie`);
-    const json = (await res.json()) as { data?: { list?: WeiboPost[]; since_id?: string } };
-    if (!json.data?.list) throw new Error("微博返回里没有 data.list：登录态已失效，请到后台「设置 → 采集凭据」更新 cookie 和 XSRF token");
-    sinceId = json.data.since_id;
-    for (const post of json.data.list) {
+    const data = await fetchWeiboPage(uid, page, credentials, fetcher, sinceId);
+    sinceId = data.since_id;
+    for (const post of data.list) {
       avatar ??= avatarOf(post);
       const item = await toItem(post, uid, headers);
       if (item) out.push(item);
     }
   }
   return { items: out, avatar };
+}
+
+/** 用后台已保存的凭据只读第一页，确认能取到列表；不写文章、账号或采集记录。 */
+export async function testWeiboCredentials(uid: string, fetcher: typeof fetch = fetch): Promise<{ ok: boolean; count?: number; error?: string }> {
+  try {
+    const credentials = await requireWeiboCredentials();
+    const data = await fetchWeiboPage(uid, "1", credentials, fetcher);
+    return { ok: true, count: data.list.length };
+  } catch (error) {
+    return { ok: false, error: String(error instanceof Error ? error.message : error).slice(0, 300) };
+  }
 }

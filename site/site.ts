@@ -229,6 +229,13 @@ export const SOURCE_DEFAULTS = {
   siteFulltext: false,
 };
 
+/** 来源筛选项及显示顺序；labels 只改变筛选显示，不改变信源本身。 */
+export const SOURCE_FILTERS = {
+  platforms: ["weibo", "mp_account"] as string[],
+  sources: ["ext-cls", "ithome-auto", "gasgoo-auto"] as string[],
+  labels: { "ithome-auto": "IT之家" } as Record<string, string>,
+};
+
 /**
  * 社区站的信源（填信源 id）：算热度时按发帖的账号计，一个账号算一个独立来源，而不是整个信源只算一个。
  * dev 是 dev.to 的文章流，hn 是 Hacker News 的帖子流。

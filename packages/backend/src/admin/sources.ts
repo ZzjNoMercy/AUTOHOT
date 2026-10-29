@@ -29,6 +29,8 @@ export interface SourceListFilters {
   page?: number;
 }
 
+const SOURCE_PAGE_SIZE = 20;
+
 export async function listSources(f: SourceListFilters): Promise<BeforeJson<AdminSources>> {
   const page = Math.max(1, f.page ?? 1);
   const q = f.q?.trim() ? `%${f.q.trim()}%` : null;
@@ -46,7 +48,7 @@ export async function listSources(f: SourceListFilters): Promise<BeforeJson<Admi
         AND (${f.mode ?? null}::text IS NULL OR participation_mode = ${f.mode ?? null})
         AND (${f.enabled ?? null}::text IS NULL OR enabled = (${f.enabled ?? null} = 'true'))
       ORDER BY enabled DESC, CASE health WHEN 'failing' THEN 0 WHEN 'degraded' THEN 1 ELSE 2 END, name, id
-      LIMIT 100 OFFSET ${(page - 1) * 100}
+      LIMIT ${SOURCE_PAGE_SIZE} OFFSET ${(page - 1) * SOURCE_PAGE_SIZE}
     ) s
     ORDER BY s.enabled DESC, CASE s.health WHEN 'failing' THEN 0 WHEN 'degraded' THEN 1 ELSE 2 END, s.name, s.id`,
     sql<{ total: number; enabled: number; failing: number; degraded: number }[]>`

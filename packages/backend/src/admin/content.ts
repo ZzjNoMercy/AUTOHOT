@@ -33,7 +33,7 @@ interface PublicationDateMaterial {
   updated_at: Date;
 }
 
-/** A reviewed historical date correction; independent discovery order and editorial state are retained. */
+/** A reviewed historical date correction; discovery time and editorial state are retained. */
 export function publicationDateCorrectionPlan(article: PublicationDateMaterial, publishedAt: string, now = Date.now()) {
   const date = new Date(publishedAt);
   if (!Number.isFinite(date.getTime()) || date.toISOString() !== publishedAt) throw new Error("发布时间必须是完整、有效的 UTC ISO 日期");
@@ -42,12 +42,11 @@ export function publicationDateCorrectionPlan(article: PublicationDateMaterial, 
   if (!article.published_at || article.published_at.getTime() >= recent || date.getTime() >= recent) throw new Error("这里只校正新旧日期均早于七天窗口的历史内容");
   const before = { publishedAt: article.published_at.toISOString(), publishedAtClaim: article.published_at_claim?.toISOString() ?? null,
     timelineAt: article.timeline_at.toISOString() };
-  const timelineFollowsPublication = before.timelineAt === before.publishedAt;
-  const after = { publishedAt, publishedAtClaim: publishedAt, timelineAt: timelineFollowsPublication ? publishedAt : before.timelineAt };
+  const after = { publishedAt, publishedAtClaim: publishedAt, timelineAt: publishedAt };
   const hash = sha256(stableJson({ id: article.id, identity: article.identity_key, source: article.source_id, url: article.url,
     version: article.revision, contentHash: article.content_hash, updatedAt: article.updated_at,
     discoveredAt: article.discovered_at, backfill: article.backfill, backfillReason: article.backfill_reason, before, requested: publishedAt }));
-  return { articleId: article.id, version: article.revision, hash, before, after, timelineFollowsPublication,
+  return { articleId: article.id, version: article.revision, hash, before, after,
     changed: before.publishedAt !== publishedAt };
 }
 

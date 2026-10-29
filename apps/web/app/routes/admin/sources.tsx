@@ -109,7 +109,7 @@ export default function Sources({ loaderData }: Route.ComponentProps) {
           ]}
         />
       </Card>
-      <Pager page={page} hasMore={rows.length === 100} />
+      <Pager page={page} hasMore={rows.length === 20} />
     </AdminPage>
   );
 }

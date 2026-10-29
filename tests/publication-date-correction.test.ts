@@ -1,6 +1,6 @@
 // Failure cases: a verified historical date is rejected because imported discovery time is guessed;
-// correction changes content revisions, paid decisions or selection; an independent discovery sort is
-// overwritten; recent/future or malformed dates and stale identities are accepted; a retry applies a
+// correction changes content revisions, paid decisions or selection; an old discovery-based timeline
+// survives a verified date correction; recent/future or malformed dates and stale identities are accepted; a retry applies a
 // second edit; a failed audit leaves dates, projections or cache invalidation only partly committed.
 import { tag } from './setup.ts';
 import assert from 'node:assert/strict';
@@ -49,7 +49,6 @@ test('verified old dates correct publication and its existing date-based sort wi
   const id=await fixture();
   const before=await retained(id);
   const plan=(await previewPublicationDateCorrection(id,corrected))!;
-  assert.equal(plan.timelineFollowsPublication,true);
   assert.equal(plan.after.publishedAt,corrected);
   assert.equal(plan.after.timelineAt,corrected);
   const result=await correctPublicationDate(id,{version:plan.version,hash:plan.hash,publishedAt:corrected,requestId:`date-${id}`,reason:'Explicit published byline verified'},'test');
@@ -64,13 +63,14 @@ test('verified old dates correct publication and its existing date-based sort wi
   assert.equal((await sql`SELECT 1 FROM settings WHERE key=${`date-hook:${id}`}`).length,1);
 });
 
-test('an independently recorded discovery sort remains unchanged',async()=>{
+test('correcting a historical publication date also brings its timeline to the original time',async()=>{
   const id=await fixture(true);const plan=(await previewPublicationDateCorrection(id,corrected))!;
-  assert.equal(plan.timelineFollowsPublication,false);
-  assert.equal(plan.after.timelineAt,'2020-11-01T00:00:00.000Z');
+  assert.equal(plan.after.timelineAt,corrected);
   await correctPublicationDate(id,{version:plan.version,hash:plan.hash,publishedAt:corrected,requestId:`date-${id}`,reason:'Verified original date'},'test');
   const [a]=await sql`SELECT timeline_at FROM articles WHERE id=${id}`;
-  assert.equal(a!.timeline_at.toISOString(),'2020-11-01T00:00:00.000Z');
+  assert.equal(a!.timeline_at.toISOString(),corrected);
+  const [p]=await sql`SELECT timeline_at FROM publications WHERE article_id=${id}`;
+  assert.equal(p!.timeline_at.toISOString(),corrected);
 });
 
 test('the request is idempotent and a reused request identity cannot approve a different date',async()=>{
